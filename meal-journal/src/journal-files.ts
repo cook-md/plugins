@@ -3,6 +3,8 @@
  * This module must not import 'vscode' so it stays unit-testable in plain Node.
  */
 
+import * as posixPath from 'node:path/posix';
+
 export const JOURNAL_EXTENSION = '.journal';
 
 export const DEFAULT_TEMPLATE = [
@@ -51,4 +53,31 @@ export function renderTemplate(template: string, date: Date): string {
     return template
         .replaceAll('${date}', isoDate(date))
         .replaceAll('${title}', humanTitle(date));
+}
+
+/**
+ * Nearest existing entry before/after `current` by filename order
+ * (ISO dates sort lexically). Non-journal files are ignored.
+ */
+export function adjacentEntry(entries: string[], current: string, direction: 'previous' | 'next'): string | undefined {
+    const sorted = entries.filter(isJournalFileName).sort();
+    if (direction === 'previous') {
+        const earlier = sorted.filter(name => name < current);
+        return earlier[earlier.length - 1];
+    }
+    return sorted.find(name => name > current);
+}
+
+/**
+ * Cooklang recipe reference for a recipe, relative to the journal file's folder.
+ * Both arguments are workspace-relative POSIX paths ('' = workspace root).
+ * E.g. ('Journal', 'Christmas Dinner/Turkey.cook') -> '@../Christmas Dinner/Turkey{}'.
+ */
+export function recipeReference(journalDir: string, recipePath: string): string {
+    const withoutExtension = recipePath.replace(/\.cook$/, '');
+    let relative = posixPath.relative(journalDir || '.', withoutExtension);
+    if (!relative.startsWith('.')) {
+        relative = `./${relative}`;
+    }
+    return `@${relative}{}`;
 }

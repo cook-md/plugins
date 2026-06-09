@@ -4,7 +4,9 @@ import {
     fileNameForDate,
     humanTitle,
     isJournalFileName,
-    renderTemplate
+    renderTemplate,
+    adjacentEntry,
+    recipeReference
 } from './journal-files';
 
 describe('journal-files', () => {
@@ -55,6 +57,56 @@ describe('journal-files', () => {
             assert.ok(rendered.includes('= Breakfast'));
             assert.ok(rendered.includes('= Lunch'));
             assert.ok(rendered.includes('= Dinner'));
+        });
+    });
+
+    describe('adjacentEntry', () => {
+        const entries = ['2026-06-01.journal', '2026-06-05.journal', '2026-06-09.journal', 'aisle.conf', 'notes.journal'];
+
+        it('finds the previous entry', () => {
+            assert.strictEqual(adjacentEntry(entries, '2026-06-05.journal', 'previous'), '2026-06-01.journal');
+        });
+
+        it('finds the next entry', () => {
+            assert.strictEqual(adjacentEntry(entries, '2026-06-05.journal', 'next'), '2026-06-09.journal');
+        });
+
+        it('returns undefined at the start', () => {
+            assert.strictEqual(adjacentEntry(entries, '2026-06-01.journal', 'previous'), undefined);
+        });
+
+        it('returns undefined at the end', () => {
+            assert.strictEqual(adjacentEntry(entries, '2026-06-09.journal', 'next'), undefined);
+        });
+
+        it('works when the current file is not in the list', () => {
+            assert.strictEqual(adjacentEntry(entries, '2026-06-07.journal', 'previous'), '2026-06-05.journal');
+            assert.strictEqual(adjacentEntry(entries, '2026-06-07.journal', 'next'), '2026-06-09.journal');
+        });
+
+        it('ignores files that are not date-named journals', () => {
+            assert.strictEqual(adjacentEntry(['aisle.conf', 'notes.journal'], '2026-06-05.journal', 'previous'), undefined);
+        });
+    });
+
+    describe('recipeReference', () => {
+        it('references a recipe in a sibling folder', () => {
+            assert.strictEqual(
+                recipeReference('Journal', 'Christmas Dinner/Turkey.cook'),
+                '@../Christmas Dinner/Turkey{}'
+            );
+        });
+
+        it('references a recipe in the same folder', () => {
+            assert.strictEqual(recipeReference('Journal', 'Journal/leftovers.cook'), '@./leftovers{}');
+        });
+
+        it('references a recipe from the workspace root', () => {
+            assert.strictEqual(recipeReference('', 'Turkey.cook'), '@./Turkey{}');
+        });
+
+        it('strips only the .cook extension', () => {
+            assert.strictEqual(recipeReference('', 'soups/pho.bo.cook'), '@./soups/pho.bo{}');
         });
     });
 });
