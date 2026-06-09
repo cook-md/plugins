@@ -1,0 +1,120 @@
+{
+  "name": "meal-journal",
+  "displayName": "Meal Journal",
+  "description": "Daily meal journal using Cooklang markup. Reference example for Cook Editor plugin developers.",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "cooklang",
+        "extensions": [
+          ".journal"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "mealJournal.openToday",
+        "title": "Open Today",
+        "category": "Journal",
+        "icon": "$(calendar)"
+      },
+      {
+        "command": "mealJournal.openYesterday",
+        "title": "Open Yesterday",
+        "category": "Journal"
+      },
+      {
+        "command": "mealJournal.openPreviousEntry",
+        "title": "Open Previous Entry",
+        "category": "Journal",
+        "icon": "$(chevron-left)"
+      },
+      {
+        "command": "mealJournal.openNextEntry",
+        "title": "Open Next Entry",
+        "category": "Journal",
+        "icon": "$(chevron-right)"
+      },
+      {
+        "command": "mealJournal.insertRecipeReference",
+        "title": "Insert Recipe Reference",
+        "category": "Journal",
+        "icon": "$(book)"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "mealJournal.openToday",
+        "key": "ctrl+shift+j",
+        "mac": "cmd+shift+j"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "mealJournal.openPreviousEntry",
+          "when": "resourceExtname == .journal",
+          "group": "navigation@1"
+        },
+        {
+          "command": "mealJournal.openNextEntry",
+          "when": "resourceExtname == .journal",
+          "group": "navigation@2"
+        },
+        {
+          "command": "mealJournal.insertRecipeReference",
+          "when": "resourceExtname == .journal",
+          "group": "navigation@3"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Meal Journal",
+      "properties": {
+        "mealJournal.folder": {
+          "type": "string",
+          "default": "Journal",
+          "description": "Folder under the workspace root where journal entries are stored."
+        },
+        "mealJournal.template": {
+          "type": "string",
+          "default": "",
+          "editPresentation": "multilineText",
+          "markdownDescription": "Template for new journal entries. Supports `${date}` (e.g. `2026-06-09`) and `${title}` (e.g. `Tuesday, 9 June 2026`). Leave empty to use the built-in template."
+        }
+      }
+    },
+    "snippets": [
+      {
+        "language": "cooklang",
+        "path": "./snippets/cooklang.json"
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "npm run compile && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.100.0",
+    "mocha": "^10.4.0",
+    "typescript": "~5.4.5"
+  }
+}
