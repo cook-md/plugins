@@ -1,0 +1,18 @@
+{
+  "Meal section": {
+    "prefix": "section",
+    "body": [
+      "= ${1:Breakfast}",
+      "",
+      "$0"
+    ],
+    "description": "Insert a meal section heading"
+  },
+  "Recipe reference": {
+    "prefix": "recipe",
+    "body": [
+      "@./${1:path/Recipe Name}{$2}"
+    ],
+    "description": "Insert a Cooklang recipe reference"
+  }
+}
