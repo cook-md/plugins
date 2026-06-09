@@ -4,11 +4,11 @@ import { pickAndInsertRecipeReference } from './recipe-picker';
 
 export function activate(context: vscode.ExtensionContext): void {
     context.subscriptions.push(
-        vscode.commands.registerCommand('mealJournal.openToday', () => openOrCreateEntry(dateWithOffset(0))),
-        vscode.commands.registerCommand('mealJournal.openYesterday', () => openYesterday()),
-        vscode.commands.registerCommand('mealJournal.openPreviousEntry', () => openAdjacentEntry('previous')),
-        vscode.commands.registerCommand('mealJournal.openNextEntry', () => openAdjacentEntry('next')),
-        vscode.commands.registerCommand('mealJournal.insertRecipeReference', () => pickAndInsertRecipeReference())
+        vscode.commands.registerCommand('mealJournal.openToday', runSafely(() => openOrCreateEntry(dateWithOffset(0)))),
+        vscode.commands.registerCommand('mealJournal.openYesterday', runSafely(() => openYesterday())),
+        vscode.commands.registerCommand('mealJournal.openPreviousEntry', runSafely(() => openAdjacentEntry('previous'))),
+        vscode.commands.registerCommand('mealJournal.openNextEntry', runSafely(() => openAdjacentEntry('next'))),
+        vscode.commands.registerCommand('mealJournal.insertRecipeReference', runSafely(() => pickAndInsertRecipeReference()))
     );
 
     const statusBarItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
@@ -21,6 +21,18 @@ export function activate(context: vscode.ExtensionContext): void {
 
 export function deactivate(): void {
     // nothing to clean up; subscriptions are disposed by the host
+}
+
+/** Wraps an async command so failures surface as error messages instead of unhandled rejections. */
+function runSafely(run: () => Promise<void>): () => Promise<void> {
+    return async () => {
+        try {
+            await run();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            vscode.window.showErrorMessage(`Meal Journal: ${message}`);
+        }
+    };
 }
 
 function dateWithOffset(days: number): Date {
@@ -75,7 +87,7 @@ async function openYesterday(): Promise<void> {
 async function openAdjacentEntry(direction: 'previous' | 'next'): Promise<void> {
     const activeUri = vscode.window.activeTextEditor?.document.uri;
     const currentName = activeUri?.path.split('/').pop();
-    if (!activeUri || !currentName || !isJournalFileName(currentName)) {
+    if (!activeUri || activeUri.scheme !== 'file' || !currentName || !isJournalFileName(currentName)) {
         vscode.window.showWarningMessage('Meal Journal: open a journal entry first.');
         return;
     }
