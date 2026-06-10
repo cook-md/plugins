@@ -45,6 +45,30 @@ At startup the app loads every plugin found in `editor/plugins/` — an unpacked
 
 The dev loop is: edit → `npm run deploy` → restart the editor.
 
+## Publishing to plugins.cook.md
+
+Releases go to the [Cook plugins marketplace](https://plugins.cook.md) (an
+OpenVSX-compatible registry). One-time setup:
+
+1. Sign in at https://plugins.cook.md with GitHub and create a personal access
+   token (PAT) in your dashboard.
+2. Create the namespace matching the plugin's `publisher` (once per namespace):
+
+   ```bash
+   npx ovsx create-namespace cooklang -r https://plugins.cook.md -p <PAT>
+   ```
+
+To release a new version:
+
+```bash
+cd meal-journal
+npm version patch        # or minor/major — updates package.json
+npm run package          # builds meal-journal-<version>.vsix
+OVSX_PAT=<PAT> npm run publish:marketplace
+```
+
+Verify with `curl https://plugins.cook.md/api/cooklang/meal-journal`.
+
 ## Useful references
 
 - [VS Code Extension API docs](https://code.visualstudio.com/api)
