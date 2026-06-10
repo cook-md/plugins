@@ -5,6 +5,17 @@
   "version": "0.1.0",
   "publisher": "cooklang",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cook-md/plugins.git",
+    "directory": "meal-journal"
+  },
+  "keywords": [
+    "cooklang",
+    "journal",
+    "recipes",
+    "meal-planning"
+  ],
   "engines": {
     "vscode": "^1.100.0"
   },
@@ -108,13 +119,18 @@
     "compile": "tsc -p .",
     "watch": "tsc -w -p .",
     "test": "npm run compile && mocha \"out/**/*.spec.js\"",
-    "deploy": "npm run compile && node ./scripts/deploy.js"
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath meal-journal-$npm_package_version.vsix -r https://plugins.cook.md"
   },
   "devDependencies": {
     "@types/mocha": "^10.0.6",
     "@types/node": "^18.19.0",
-    "@types/vscode": "^1.100.0",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^3.3.0",
     "mocha": "^10.4.0",
+    "ovsx": "^1.0.0",
     "typescript": "~5.4.5"
   }
 }
