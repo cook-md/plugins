@@ -1,0 +1,108 @@
+body {
+    padding: 0;
+    color: var(--vscode-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    line-height: 1.6;
+}
+
+#root { padding: 12px 16px; }
+
+.empty {
+    padding: 16px;
+    color: var(--vscode-descriptionForeground);
+    font-style: italic;
+    text-align: center;
+}
+
+.error { padding: 8px 0; color: var(--vscode-errorForeground); }
+
+.section-title {
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin: 0 0 4px 0;
+}
+
+.recipes {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.recipes-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+
+.clear {
+    background: none;
+    border: 1px solid var(--vscode-panel-border);
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.85em;
+    padding: 2px 8px;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.clear:hover { color: var(--vscode-foreground); border-color: var(--vscode-foreground); }
+
+.recipe-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.recipe-row:last-child { border-bottom: none; }
+.recipe-main { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.recipe-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recipe-detail { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
+
+.scale {
+    width: 48px;
+    padding: 2px 4px;
+    font-size: 0.85em;
+    text-align: center;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+    border-radius: 3px;
+}
+
+.remove {
+    background: none;
+    border: none;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0 4px;
+    line-height: 1;
+}
+
+.remove:hover { color: var(--vscode-errorForeground); }
+
+.category { margin-bottom: 12px; }
+.category .section-title { padding: 4px 0; border-bottom: 1px solid var(--vscode-panel-border); }
+
+.ingredient { display: flex; align-items: center; gap: 8px; padding: 3px 0; cursor: pointer; }
+.ingredient input { margin: 0; accent-color: var(--vscode-focusBorder); }
+.ingredient-name { flex: 1; }
+.ingredient-qty { color: var(--vscode-descriptionForeground); font-size: 0.85em; white-space: nowrap; }
+.ingredient.checked { opacity: 0.5; }
+.ingredient.checked .ingredient-name { text-decoration: line-through; }
+
+.pantry { margin-top: 16px; padding-top: 8px; border-top: 1px solid var(--vscode-panel-border); }
+
+.pantry-toggle {
+    background: none;
+    border: none;
+    color: var(--vscode-descriptionForeground);
+    cursor: pointer;
+    font-size: 0.85em;
+    font-weight: 600;
+    padding: 4px 0;
+}
+
+.pantry-toggle:hover { text-decoration: underline; color: var(--vscode-foreground); }
+.pantry-list { list-style: none; margin: 4px 0 0 0; padding: 0 0 0 20px; }
+.pantry-list li { font-size: 0.85em; color: var(--vscode-descriptionForeground); padding: 2px 0; }

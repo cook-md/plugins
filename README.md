@@ -6,6 +6,7 @@ writing your own. Each plugin is a standalone npm package in its own folder.
 | Plugin | Description |
 |---|---|
 | [`meal-journal`](./meal-journal) | Daily meal journal in Cooklang markup. **Start here** — it demonstrates the most common plugin APIs. |
+| [`shopping-list`](./shopping-list) | Aisle-grouped shopping lists with pantry subtraction. Ships with Cook Editor. Shows the Cooklang API and outlets. |
 
 ## How plugins work
 
