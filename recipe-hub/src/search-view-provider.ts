@@ -1,7 +1,7 @@
 import { randomBytes } from 'crypto';
 import * as vscode from 'vscode';
 import { HubClient, HubError } from './hub-client';
-import { serverOrigin } from './hub-urls';
+import { imageSources, serverOrigin } from './hub-urls';
 import { parseFromWebview, ToWebview } from './protocol';
 import { PAGE_SIZE, primaryLanguage, SearchFilters } from './search-query';
 
@@ -84,13 +84,11 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
         const nonce = randomBytes(16).toString('hex');
         const css = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'recipe-hub.css'));
         const script = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'out', 'webview.js'));
-        const origin = serverOrigin(this.host.serverUrl());
-        const imageSources = origin === undefined ? 'https:' : `https: ${origin}`;
         return `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${imageSources}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src ${imageSources(this.host.serverUrl())}; style-src ${webview.cspSource}; script-src 'nonce-${nonce}';">
 <link rel="stylesheet" href="${css}">
 </head>
 <body><div id="root"></div><script nonce="${nonce}" src="${script}"></script></body>

@@ -24,6 +24,21 @@ export function serverOrigin(serverUrl: string): string | undefined {
     return url === undefined ? undefined : new URL(url).origin;
 }
 
+/**
+ * The server to talk to: the configured URL, trimmed, when it is http(s);
+ * otherwise `fallback`. Nothing downstream (client, CSP, links) sees other schemes.
+ */
+export function effectiveServerUrl(configured: string | undefined, fallback: string): string {
+    const trimmed = trimServerUrl(configured ?? '');
+    return serverOrigin(trimmed) === undefined ? fallback : trimmed;
+}
+
+/** CSP `img-src` for the panel: any https image, plus the server origin when it is plain http. */
+export function imageSources(serverUrl: string): string {
+    const origin = serverOrigin(serverUrl);
+    return origin !== undefined && origin.startsWith('http:') ? `https: ${origin}` : 'https:';
+}
+
 /** The recipe's page on the Recipe Hub website. */
 export function hubRecipePageUrl(serverUrl: string, id: number): string {
     return `${trimServerUrl(serverUrl)}/recipes/${id}`;

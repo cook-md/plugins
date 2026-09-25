@@ -4,7 +4,7 @@ import { DEFAULT_SERVER_URL, HubClient } from './hub-client';
 import { HubFileSystemProvider } from './hub-file-system';
 import { HubFileSystemCore, loadRecipeContent } from './hub-file-system-core';
 import { HUB_SCHEME, outletContextUri, parseRecipePath, recipePath, titleFromFileName } from './hub-uri';
-import { originalRecipeUrl, trimServerUrl } from './hub-urls';
+import { effectiveServerUrl, httpUrl, originalRecipeUrl } from './hub-urls';
 import { buildSaveDraftArgs } from './recipe-draft';
 import { SearchViewHost, SearchViewProvider, VIEW_ID } from './search-view-provider';
 
@@ -46,8 +46,8 @@ export class RecipeHubController implements SearchViewHost {
     }
 
     serverUrl(): string {
-        const configured = vscode.workspace.getConfiguration('recipeHub').get<string>('serverUrl', DEFAULT_SERVER_URL);
-        return trimServerUrl(configured) || DEFAULT_SERVER_URL;
+        const configured = vscode.workspace.getConfiguration('recipeHub').get<unknown>('serverUrl');
+        return effectiveServerUrl(typeof configured === 'string' ? configured : undefined, DEFAULT_SERVER_URL);
     }
 
     hub(): HubClient {
@@ -73,6 +73,10 @@ export class RecipeHubController implements SearchViewHost {
     protected async saveToDrafts(arg: unknown): Promise<void> {
         await this.ensure(this.api.canSaveDrafts(), 'Update Cook Editor to save drafts.');
         const target = this.target(arg);
+        // Drafts live in the workspace; the editor's own refusal talks about importing.
+        if (!vscode.workspace.workspaceFolders?.length) {
+            throw new Error('Open a folder to save recipes to Drafts.');
+        }
         const content = new TextDecoder().decode(await this.files.readFile(target.path));
         const detail = await this.hub().recipe(target.id).catch((e: unknown) => {
             console.warn(`[recipe-hub] no details for recipe ${target.id}; saving without them:`, e);
@@ -90,7 +94,11 @@ export class RecipeHubController implements SearchViewHost {
     protected async openSource(arg: unknown): Promise<void> {
         const target = this.target(arg);
         const detail = await this.hub().recipe(target.id).catch(() => undefined);
-        await vscode.env.openExternal(vscode.Uri.parse(originalRecipeUrl(detail?.sourceUrl, this.serverUrl(), target.id)));
+        const url = httpUrl(originalRecipeUrl(detail?.sourceUrl, this.serverUrl(), target.id));
+        if (url === undefined) {
+            throw new Error(`Recipe ${target.id} has no web address to open.`);
+        }
+        await vscode.env.openExternal(vscode.Uri.parse(url));
     }
 
     protected target(arg: unknown): HubTarget {

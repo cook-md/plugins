@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { httpUrl, isDisplayableImageUrl, originalRecipeUrl, serverOrigin, trimServerUrl } from './hub-urls';
+import { effectiveServerUrl, httpUrl, imageSources, isDisplayableImageUrl, originalRecipeUrl, serverOrigin, trimServerUrl } from './hub-urls';
 
 describe('hub URLs', () => {
     it('trimServerUrl drops whitespace and trailing slashes', () => {
@@ -18,6 +18,23 @@ describe('hub URLs', () => {
         assert.strictEqual(serverOrigin('http://localhost:8080/'), 'http://localhost:8080');
         assert.strictEqual(serverOrigin('https://recipes.cooklang.org'), 'https://recipes.cooklang.org');
         assert.strictEqual(serverOrigin('ftp://hub.example'), undefined);
+    });
+
+    it('effectiveServerUrl keeps a trimmed http(s) URL and falls back otherwise', () => {
+        const fallback = 'https://recipes.cooklang.org';
+        assert.strictEqual(effectiveServerUrl(' http://localhost:8080/ ', fallback), 'http://localhost:8080');
+        assert.strictEqual(effectiveServerUrl('https://hub.example/base/', fallback), 'https://hub.example/base');
+        assert.strictEqual(effectiveServerUrl('file:///etc', fallback), fallback);
+        assert.strictEqual(effectiveServerUrl('javascript:alert(1)', fallback), fallback);
+        assert.strictEqual(effectiveServerUrl('not a url', fallback), fallback);
+        assert.strictEqual(effectiveServerUrl('   ', fallback), fallback);
+        assert.strictEqual(effectiveServerUrl(undefined, fallback), fallback);
+    });
+
+    it('imageSources adds the server origin only for plain http', () => {
+        assert.strictEqual(imageSources('https://recipes.cooklang.org'), 'https:');
+        assert.strictEqual(imageSources('http://localhost:8080/'), 'https: http://localhost:8080');
+        assert.strictEqual(imageSources('file:///etc'), 'https:');
     });
 
     it('originalRecipeUrl prefers the source and falls back to the Recipe Hub page', () => {
