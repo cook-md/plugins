@@ -108,7 +108,8 @@
     }
   },
   "scripts": {
-    "compile": "tsc -p . && npm run bundle:webview",
+    "compile": "tsc -p . && npm run typecheck:webview && npm run bundle:webview",
+    "typecheck:webview": "tsc -p tsconfig.webview.json",
     "bundle:webview": "esbuild src/webview/main.ts --bundle --format=iife --target=es2020 --outfile=out/webview.js",
     "watch": "tsc -w -p .",
     "test": "tsc -p . && mocha \"out/**/*.spec.js\"",

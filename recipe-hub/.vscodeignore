@@ -1,6 +1,6 @@
 src/**
 scripts/**
-tsconfig.json
+tsconfig*.json
 package-lock.json
 .vscodeignore
 out/**/*.spec.js

@@ -11,5 +11,6 @@
     "skipLibCheck": true,
     "types": ["node", "mocha"]
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["src/webview"]
 }
