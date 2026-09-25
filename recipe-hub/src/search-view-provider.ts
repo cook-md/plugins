@@ -32,6 +32,10 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
      * could otherwise match a new request's `seq`.
      */
     protected generation = 0;
+    /** Whether the current webview has finished its `ready` → `init` handshake; posting before this is dropped silently. */
+    protected ready = false;
+    /** A `focusSearch()` call that arrived before `ready`; sent as soon as the handshake completes, then cleared. */
+    protected pendingFocus = false;
 
     constructor(
         protected readonly extensionUri: vscode.Uri,
@@ -42,6 +46,7 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
     resolveWebviewView(view: vscode.WebviewView): void {
         this.disposeView();
         this.view = view;
+        this.ready = false;
         view.webview.options = {
             enableScripts: true,
             localResourceRoots: [vscode.Uri.joinPath(this.extensionUri, 'media'), vscode.Uri.joinPath(this.extensionUri, 'out')],
@@ -52,6 +57,7 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
             view.onDidDispose(() => {
                 if (this.view === view) {
                     this.view = undefined;
+                    this.ready = false;
                     this.disposeView();
                 }
             }),
@@ -61,13 +67,24 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
     /** The server changed: reload the webview so its CSP, facets and results follow the new server. */
     reload(): void {
         this.restart();
+        this.ready = false;
         if (this.view) {
             this.view.webview.html = this.html(this.view.webview);
         }
     }
 
+    /**
+     * Focuses the search box. The webview may not exist yet (the view container
+     * was just revealed) or may not have finished its `ready` handshake, so a
+     * message posted now would be lost; queue it and send it once `ready`
+     * replies with `init`.
+     */
     focusSearch(): void {
-        this.post({ type: 'focusSearch' });
+        if (this.ready) {
+            this.post({ type: 'focusSearch' });
+        } else {
+            this.pendingFocus = true;
+        }
     }
 
     dispose(): void {
@@ -109,12 +126,17 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
         switch (message.type) {
             case 'ready':
                 this.restart();
+                this.ready = true;
                 this.post({
                     type: 'init',
                     defaultLocale: primaryLanguage(vscode.env.language),
                     serverOrigin: serverOrigin(this.host.serverUrl()) ?? '',
                     state: this.panelState.read(),
                 });
+                if (this.pendingFocus) {
+                    this.pendingFocus = false;
+                    this.post({ type: 'focusSearch' });
+                }
                 await this.loadFacets();
                 return;
             case 'search':
