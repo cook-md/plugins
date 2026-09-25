@@ -1,9 +1,10 @@
 import { randomBytes } from 'crypto';
 import * as vscode from 'vscode';
-import { HubClient, HubError } from './hub-client';
+import { HubClient } from './hub-client';
 import { imageSources, serverOrigin } from './hub-urls';
 import { PanelStateStore } from './panel-state-store';
 import { parseFromWebview, ToWebview } from './protocol';
+import { asHubError, ResponseGate } from './response-gate';
 import { PAGE_SIZE, primaryLanguage, SearchFilters } from './search-query';
 
 export const VIEW_ID = 'recipeHub.view';
@@ -24,14 +25,8 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
 
     protected view: vscode.WebviewView | undefined;
     protected viewDisposables: vscode.Disposable[] = [];
-    /** Sequence number of the newest search the webview asked for; responses to older ones are dropped. */
-    protected latestSeq = 0;
-    /**
-     * Bumped whenever the webview restarts (reload, `ready`). The restarted
-     * webview counts `seq` from 1 again, so a response from before the restart
-     * could otherwise match a new request's `seq`.
-     */
-    protected generation = 0;
+    /** Drops stale search/facets responses across webview restarts; see response-gate.ts. */
+    protected readonly gate = new ResponseGate();
     /** Whether the current webview has finished its `ready` → `init` handshake; posting before this is dropped silently. */
     protected ready = false;
     /** A `focusSearch()` call that arrived before `ready`; sent as soon as the handshake completes, then cleared. */
@@ -66,7 +61,7 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
 
     /** The server changed: reload the webview so its CSP, facets and results follow the new server. */
     reload(): void {
-        this.restart();
+        this.gate.restart();
         this.ready = false;
         if (this.view) {
             this.view.webview.html = this.html(this.view.webview);
@@ -98,11 +93,6 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
         this.viewDisposables = [];
     }
 
-    protected restart(): void {
-        this.latestSeq = 0;
-        this.generation += 1;
-    }
-
     protected html(webview: vscode.Webview): string {
         const nonce = randomBytes(16).toString('hex');
         const css = webview.asWebviewUri(vscode.Uri.joinPath(this.extensionUri, 'media', 'recipe-hub.css'));
@@ -125,7 +115,7 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
         }
         switch (message.type) {
             case 'ready':
-                this.restart();
+                this.gate.restart();
                 this.ready = true;
                 this.post({
                     type: 'init',
@@ -156,9 +146,7 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
     }
 
     protected async search(seq: number, filters: SearchFilters, page: number): Promise<void> {
-        this.latestSeq = seq;
-        const generation = this.generation;
-        const current = (): boolean => seq === this.latestSeq && generation === this.generation;
+        const current = this.gate.startRequest(seq);
         try {
             const result = await this.host.hub().search(filters, page, PAGE_SIZE);
             if (!current()) {
@@ -169,17 +157,17 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
             if (!current()) {
                 return;
             }
-            const error = e instanceof HubError ? e : new HubError('network', errorMessage(e));
+            const error = asHubError(e);
             this.post({ type: 'error', seq, kind: error.kind, message: error.message });
         }
     }
 
     /** Facets only enrich the filters (tag list, languages); without them the panel still searches. */
     protected async loadFacets(): Promise<void> {
-        const generation = this.generation;
+        const current = this.gate.startGenerationRequest();
         try {
             const facets = await this.host.hub().facets();
-            if (generation === this.generation) {
+            if (current()) {
                 this.post({ type: 'facets', facets });
             }
         } catch (e) {
