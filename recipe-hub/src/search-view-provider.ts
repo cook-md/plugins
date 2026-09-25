@@ -2,6 +2,7 @@ import { randomBytes } from 'crypto';
 import * as vscode from 'vscode';
 import { HubClient, HubError } from './hub-client';
 import { imageSources, serverOrigin } from './hub-urls';
+import { PanelStateStore } from './panel-state-store';
 import { parseFromWebview, ToWebview } from './protocol';
 import { PAGE_SIZE, primaryLanguage, SearchFilters } from './search-query';
 
@@ -32,7 +33,11 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
      */
     protected generation = 0;
 
-    constructor(protected readonly extensionUri: vscode.Uri, protected readonly host: SearchViewHost) { }
+    constructor(
+        protected readonly extensionUri: vscode.Uri,
+        protected readonly host: SearchViewHost,
+        protected readonly panelState: PanelStateStore,
+    ) { }
 
     resolveWebviewView(view: vscode.WebviewView): void {
         this.disposeView();
@@ -68,6 +73,7 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
     dispose(): void {
         this.view = undefined;
         this.disposeView();
+        this.panelState.dispose();
     }
 
     protected disposeView(): void {
@@ -107,11 +113,15 @@ export class SearchViewProvider implements vscode.WebviewViewProvider, vscode.Di
                     type: 'init',
                     defaultLocale: primaryLanguage(vscode.env.language),
                     serverOrigin: serverOrigin(this.host.serverUrl()) ?? '',
+                    state: this.panelState.read(),
                 });
                 await this.loadFacets();
                 return;
             case 'search':
                 await this.search(message.seq, message.filters, message.page);
+                return;
+            case 'state':
+                this.panelState.write({ filters: message.filters, filtersOpen: message.filtersOpen, localeTouched: message.localeTouched });
                 return;
             case 'open':
                 try {

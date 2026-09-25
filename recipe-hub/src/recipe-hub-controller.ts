@@ -5,6 +5,7 @@ import { HubFileSystemProvider } from './hub-file-system';
 import { HubFileSystemCore, loadRecipeContent } from './hub-file-system-core';
 import { HUB_SCHEME, outletContextUri, parseRecipePath, recipePath, titleFromFileName } from './hub-uri';
 import { effectiveServerUrl, httpUrl, originalRecipeUrl } from './hub-urls';
+import { PanelStateStore } from './panel-state-store';
 import { buildSaveDraftArgs } from './recipe-draft';
 import { SearchViewHost, SearchViewProvider, VIEW_ID } from './search-view-provider';
 
@@ -22,7 +23,7 @@ export class RecipeHubController implements SearchViewHost {
     protected readonly view: SearchViewProvider;
 
     constructor(protected readonly context: vscode.ExtensionContext, protected readonly api: CooklangApi) {
-        this.view = new SearchViewProvider(context.extensionUri, this);
+        this.view = new SearchViewProvider(context.extensionUri, this, new PanelStateStore(context.workspaceState));
     }
 
     start(): void {
@@ -38,6 +39,7 @@ export class RecipeHubController implements SearchViewHost {
             vscode.workspace.onDidChangeConfiguration(event => {
                 if (event.affectsConfiguration('recipeHub.serverUrl')) {
                     // Recipe ids belong to one server: drop cached recipes and restart the panel.
+                    // The panel keeps its filters (webview state and the remembered panel state).
                     this.files.clear();
                     this.view.reload();
                 }

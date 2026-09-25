@@ -1,22 +1,15 @@
 import type { Facets, HubErrorKind, RecipeCard } from '../hub-client';
 import { isDisplayableImageUrl } from '../hub-urls';
-import type { FromWebview, ToWebview } from '../protocol';
+import { FromWebview, PanelState, parsePanelState, ToWebview } from '../protocol';
 import {
-    activeFilterCount, addTerm, clearFilters, emptyFilters, MAX_LIST_VALUES, MAX_TIME_PRESETS, orderServings, parseFilters,
+    activeFilterCount, addTerm, clearFilters, emptyFilters, MAX_LIST_VALUES, MAX_TIME_PRESETS, orderServings,
     resolveDefaultLocale, SearchFilters, SortOrder,
 } from '../search-query';
-
-interface SavedState {
-    filters: SearchFilters;
-    filtersOpen: boolean;
-    /** The user picked a language, so facets no longer adjust the default. */
-    localeTouched: boolean;
-}
 
 declare function acquireVsCodeApi(): {
     postMessage(message: FromWebview): void;
     getState(): unknown;
-    setState(state: SavedState): void;
+    setState(state: PanelState): void;
 };
 
 type InitMessage = Extract<ToWebview, { type: 'init' }>;
@@ -28,17 +21,13 @@ const root = document.getElementById('root')!;
 const SEARCH_DEBOUNCE_MS = 300;
 const FALLBACK_DIFFICULTIES = ['easy', 'medium', 'hard'];
 
-function readSavedState(): SavedState | undefined {
-    const raw = vscode.getState() as { filters?: unknown; filtersOpen?: unknown; localeTouched?: unknown } | undefined;
-    const filters = parseFilters(raw?.filters);
-    return filters ? { filters, filtersOpen: raw?.filtersOpen === true, localeTouched: raw?.localeTouched === true } : undefined;
-}
-
-const saved = readSavedState();
+// This webview's own state survives hide/show and reloads, but not an editor
+// restart; then the state the host remembered (sent in `init`) is used.
+const saved = parsePanelState(vscode.getState());
 let filters: SearchFilters = saved?.filters ?? emptyFilters();
 let filtersOpen = saved?.filtersOpen ?? false;
 let localeTouched = saved?.localeTouched ?? false;
-/** False until the first `init` when nothing was saved: the default language is not known before it. */
+/** False until the first `init` when this webview has no state: the host's state and the default language come with it. */
 let initialized = saved !== undefined;
 let defaultLocale = '';
 let serverOrigin = '';
@@ -298,7 +287,9 @@ function syncControls(): void {
 }
 
 function saveState(): void {
-    vscode.setState({ filters, filtersOpen, localeTouched });
+    const state: PanelState = { filters, filtersOpen, localeTouched };
+    vscode.setState(state);
+    vscode.postMessage({ type: 'state', ...state });
 }
 
 /** The language a fresh panel searches: the display language, or any if the index has none in it. */
@@ -518,7 +509,10 @@ function onInit(message: InitMessage): void {
     serverOrigin = message.serverOrigin;
     if (!initialized) {
         initialized = true;
-        filters = emptyFilters(defaultLocale);
+        const remembered = message.state === undefined ? undefined : parsePanelState(message.state);
+        filters = remembered?.filters ?? emptyFilters(defaultLocale);
+        filtersOpen = remembered?.filtersOpen ?? false;
+        localeTouched = remembered?.localeTouched ?? false;
         saveState();
     }
     syncControls();
