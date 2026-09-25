@@ -11,9 +11,12 @@ function isFsError(code: string): (e: unknown) => boolean {
     return e => e instanceof HubFsError && e.code === code;
 }
 
-function source(download: () => Promise<string>, enclosureUrl?: string): { client: ContentSource; calls: string[] } {
+function source(
+    download: () => Promise<string>, enclosureUrl?: string, baseUrl = 'https://hub.example',
+): { client: ContentSource; calls: string[] } {
     const calls: string[] = [];
     const client: ContentSource = {
+        baseUrl,
         download: async id => { calls.push(`download ${id}`); return download(); },
         recipe: async id => { calls.push(`recipe ${id}`); return enclosureUrl ? { id, title: 'Pasta', enclosureUrl } : { id, title: 'Pasta' }; },
         fetchText: async url => { calls.push(`fetch ${url}`); return 'from enclosure'; },
@@ -143,5 +146,27 @@ describe('loadRecipeContent', () => {
         const offline = source(async () => { throw new HubError('network', 'Could not reach Recipe Hub (offline).'); }, 'https://feed.example/pasta.cook');
         await assert.rejects(loadRecipeContent(offline.client, 7), /offline/);
         assert.deepStrictEqual(offline.calls, ['download 7']);
+    });
+
+    it('allows an http enclosure_url only from the configured server\'s own origin', async () => {
+        const sameOrigin = source(
+            async () => { throw new HubError('notFound', 'Recipe content not found'); }, 'http://hub.example/pasta.cook', 'http://hub.example',
+        );
+        assert.strictEqual(await loadRecipeContent(sameOrigin.client, 7), 'from enclosure');
+        assert.deepStrictEqual(sameOrigin.calls, ['download 7', 'recipe 7', 'fetch http://hub.example/pasta.cook']);
+    });
+
+    it('rejects an http enclosure_url from a different origin, rethrowing the original download error', async () => {
+        const offOrigin = source(
+            async () => { throw new HubError('notFound', 'Recipe content not found'); }, 'http://other.example/pasta.cook', 'http://hub.example',
+        );
+        await assert.rejects(loadRecipeContent(offOrigin.client, 7), /Recipe content not found/);
+        assert.deepStrictEqual(offOrigin.calls, ['download 7', 'recipe 7']);
+    });
+
+    it('rejects a non-http(s) enclosure_url, rethrowing the original download error', async () => {
+        const badScheme = source(async () => { throw new HubError('notFound', 'Recipe content not found'); }, 'file:///etc/passwd');
+        await assert.rejects(loadRecipeContent(badScheme.client, 7), /Recipe content not found/);
+        assert.deepStrictEqual(badScheme.calls, ['download 7', 'recipe 7']);
     });
 });

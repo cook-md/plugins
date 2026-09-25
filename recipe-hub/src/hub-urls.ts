@@ -52,12 +52,26 @@ export function originalRecipeUrl(sourceUrl: string | undefined, serverUrl: stri
     return httpUrl(sourceUrl) ?? hubRecipePageUrl(serverUrl, id);
 }
 
-/** Card thumbnails: any https image, or one from the configured server (plain http in development). */
-export function isDisplayableImageUrl(url: string, origin: string): boolean {
+/** https anywhere, or plain http only from `origin` (the configured server's own origin, e.g. in local development). */
+function isHttpsOrOwnOriginHttp(url: string, origin: string): boolean {
     const valid = httpUrl(url);
     if (valid === undefined) {
         return false;
     }
     const parsed = new URL(valid);
     return parsed.protocol === 'https:' || (origin !== '' && parsed.origin === origin);
+}
+
+/** Card thumbnails: any https image, or one from the configured server (plain http in development). */
+export function isDisplayableImageUrl(url: string, origin: string): boolean {
+    return isHttpsOrOwnOriginHttp(url, origin);
+}
+
+/**
+ * A trusted `download`/`enclosure_url` fallback target: any https URL, or a
+ * plain http one from the configured server's own origin. Same rule as
+ * thumbnails — anything else could be a hostile or unintended redirect target.
+ */
+export function isTrustedContentUrl(url: string, origin: string): boolean {
+    return isHttpsOrOwnOriginHttp(url, origin);
 }

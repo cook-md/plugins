@@ -4,6 +4,7 @@
 
 import { HubClient, HubError } from './hub-client';
 import { isDirectoryPath, parseRecipePath } from './hub-uri';
+import { isTrustedContentUrl, serverOrigin } from './hub-urls';
 
 export const CACHE_CAPACITY = 50;
 
@@ -144,12 +145,15 @@ function toFsError(e: unknown): HubFsError {
     return new HubFsError('Unavailable', e instanceof Error ? e.message : String(e));
 }
 
-export type ContentSource = Pick<HubClient, 'download' | 'recipe' | 'fetchText'>;
+export type ContentSource = Pick<HubClient, 'download' | 'recipe' | 'fetchText' | 'baseUrl'>;
 
 /**
  * A recipe's Cooklang source: `GET /api/recipes/:id/download`, falling back to
  * the feed's `enclosure_url` when the index has no stored content (404) or
- * fails (5xx). Network errors are not retried elsewhere.
+ * fails (5xx). Network errors are not retried elsewhere. The fallback is only
+ * followed when it is a trusted URL (`isTrustedContentUrl`); anything else
+ * (a non-http(s) scheme, or plain http off the configured server) rethrows
+ * the original download failure instead.
  */
 export async function loadRecipeContent(client: ContentSource, id: number): Promise<string> {
     try {
@@ -159,7 +163,7 @@ export async function loadRecipeContent(client: ContentSource, id: number): Prom
             throw e;
         }
         const detail = await client.recipe(id);
-        if (detail.enclosureUrl === undefined) {
+        if (detail.enclosureUrl === undefined || !isTrustedContentUrl(detail.enclosureUrl, serverOrigin(client.baseUrl) ?? '')) {
             throw e;
         }
         return client.fetchText(detail.enclosureUrl);

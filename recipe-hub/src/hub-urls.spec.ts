@@ -1,5 +1,7 @@
 import * as assert from 'assert';
-import { effectiveServerUrl, httpUrl, imageSources, isDisplayableImageUrl, originalRecipeUrl, serverOrigin, trimServerUrl } from './hub-urls';
+import {
+    effectiveServerUrl, httpUrl, imageSources, isDisplayableImageUrl, isTrustedContentUrl, originalRecipeUrl, serverOrigin, trimServerUrl,
+} from './hub-urls';
 
 describe('hub URLs', () => {
     it('trimServerUrl drops whitespace and trailing slashes', () => {
@@ -48,5 +50,13 @@ describe('hub URLs', () => {
         assert.strictEqual(isDisplayableImageUrl('http://localhost:8765/a.jpg', 'http://localhost:8765'), true);
         assert.strictEqual(isDisplayableImageUrl('http://img.example/a.jpg', 'http://localhost:8765'), false);
         assert.strictEqual(isDisplayableImageUrl('data:image/png;base64,AAAA', ''), false);
+    });
+
+    it('isTrustedContentUrl allows https and same-origin http, same as thumbnails', () => {
+        assert.strictEqual(isTrustedContentUrl('https://feed.example/pasta.cook', ''), true);
+        assert.strictEqual(isTrustedContentUrl('http://localhost:8765/pasta.cook', 'http://localhost:8765'), true);
+        assert.strictEqual(isTrustedContentUrl('http://other.example/pasta.cook', 'http://localhost:8765'), false);
+        assert.strictEqual(isTrustedContentUrl('file:///etc/passwd', ''), false);
+        assert.strictEqual(isTrustedContentUrl('javascript:alert(1)', ''), false);
     });
 });
