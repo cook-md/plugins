@@ -378,13 +378,8 @@ function onError(message: ErrorMessage): void {
 
 function errorBlock(kind: HubErrorKind, message: string): HTMLElement {
     const block = element('div', 'error');
-    const text = kind === 'network' ? 'Could not reach Recipe Hub.'
-        : kind === 'rateLimited' ? 'Too many searches — try again shortly.'
-            : message;
-    block.append(element('div', undefined, text));
-    if (kind === 'network') {
-        block.append(element('div', 'error-detail', message));
-    }
+    // Network messages already say what failed and why ("Could not reach Recipe Hub (connect ECONNREFUSED …).").
+    block.append(element('div', undefined, kind === 'rateLimited' ? 'Too many searches — try again shortly.' : message));
     block.append(button('retry', 'Retry', () => runSearch(requestedPage)));
     return block;
 }

@@ -121,7 +121,6 @@ input:focus, select:focus, button:focus-visible {
 .status, .count, .empty { padding: 4px 0; font-size: 0.9em; color: var(--vscode-descriptionForeground); }
 .empty { font-style: italic; }
 .error { padding: 6px 0; color: var(--vscode-errorForeground); }
-.error-detail { font-size: 0.85em; color: var(--vscode-descriptionForeground); }
 
 .retry, .load-more {
     margin-top: 6px;
