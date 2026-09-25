@@ -84,6 +84,24 @@ describe('HubClient', () => {
         }
     });
 
+    it('drops cards and feeds with an id that is not a positive safe integer', async () => {
+        const { fetch } = stubFetch(() => json(200, {
+            results: [
+                { id: 1.5, title: 'Fractional' },
+                { id: 0, title: 'Zero' },
+                { id: -1, title: 'Negative' },
+                { id: Number.MAX_SAFE_INTEGER + 1, title: 'Not safe' },
+                { id: 2, title: 'Good card', feed: { id: 3.5, title: 'Bad feed' } },
+                { id: 3, title: 'Good card with feed', feed: { id: 9, title: 'Good feed' } },
+            ],
+            pagination: { page: 1, limit: 20, total: 6, total_pages: 1 },
+        }));
+        const page = await new HubClient({ baseUrl: BASE, fetch }).search(emptyFilters(), 1);
+        assert.deepStrictEqual(page.cards.map(card => card.id), [2, 3]);
+        assert.strictEqual(page.cards[0].feed, undefined);
+        assert.deepStrictEqual(page.cards[1].feed, { id: 9, title: 'Good feed' });
+    });
+
     it('maps HTTP errors to kinds', async () => {
         const cases: Array<[number, string, HubErrorKind, string]> = [
             [400, JSON.stringify({ error: 'Invalid query: expected \':\'' }), 'badQuery', 'Invalid query: expected \':\''],

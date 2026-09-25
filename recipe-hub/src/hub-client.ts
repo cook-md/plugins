@@ -292,6 +292,11 @@ function optionalNumber(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 }
 
+/** An `id` field: only a positive safe integer is a real Recipe Hub id; anything else drops the card/feed it belongs to. */
+function validId(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isSafeInteger(value) && value > 0 ? value : undefined;
+}
+
 function stringList(value: unknown): string[] {
     return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string' && item.trim() !== '') : [];
 }
@@ -307,7 +312,7 @@ function unexpected(): HubError {
 
 function normalizeFeed(value: unknown): HubFeed | undefined {
     const raw = asObject(value);
-    const id = optionalNumber(raw?.id);
+    const id = validId(raw?.id);
     if (!raw || id === undefined) {
         return undefined;
     }
@@ -316,7 +321,7 @@ function normalizeFeed(value: unknown): HubFeed | undefined {
 
 function normalizeCard(value: unknown): RecipeCard | undefined {
     const raw = asObject(value);
-    const id = optionalNumber(raw?.id);
+    const id = validId(raw?.id);
     const title = optionalString(raw?.title);
     if (!raw || id === undefined || title === undefined) {
         return undefined;
