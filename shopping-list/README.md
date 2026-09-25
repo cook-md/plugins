@@ -6,6 +6,8 @@ Cooklang API and outlets.
 
 - Add a recipe or a whole `.menu` from the preview's cart button, the explorer
   context menu, or the editor title bar. Sub-recipe references are included.
+- The cart is hidden on Recipe Hub previews: remote recipes are not in your
+  folder, so save one to Drafts first.
 - Change each entry's scale, remove entries, check items off.
 - Items are grouped by `config/aisle.conf`; anything in `config/pantry.conf`
   is subtracted.
