@@ -185,4 +185,75 @@ describe('HubClient', () => {
         assert.strictEqual(await client.fetchText('https://feed.example/pasta.cook'), 'from the feed');
         assert.deepStrictEqual(calls, [{ url: 'https://feed.example/pasta.cook', accept: 'text/plain' }]);
     });
+
+    it('rejects invalid recipe ids without a request', async () => {
+        const { fetch, calls } = stubFetch(() => json(200, { id: 1, title: 'X' }));
+        const client = new HubClient({ baseUrl: BASE, fetch });
+        for (const id of [0, -1, 1.5, NaN]) {
+            const error = await rejection(client.recipe(id));
+            assert.strictEqual(error.kind, 'notFound', `id ${id} should be rejected as notFound`);
+        }
+        assert.strictEqual(calls.length, 0);
+    });
+
+    it('rejects invalid download ids without a request', async () => {
+        const { fetch, calls } = stubFetch(() => response(200, 'text'));
+        const client = new HubClient({ baseUrl: BASE, fetch });
+        for (const id of [0, -1, 1.5, NaN]) {
+            const error = await rejection(client.download(id));
+            assert.strictEqual(error.kind, 'notFound', `id ${id} should be rejected as notFound`);
+        }
+        assert.strictEqual(calls.length, 0);
+    });
+
+    it('rejects an oversize response using content-length, without reading the body', async () => {
+        let textCalled = false;
+        const fetch: FetchLike = async () => ({
+            ok: true,
+            status: 200,
+            headers: { get: (name: string) => (name.toLowerCase() === 'content-length' ? String(3 * 1024 * 1024) : null) },
+            text: async () => { textCalled = true; return '{}'; },
+        });
+        const error = await rejection(new HubClient({ baseUrl: BASE, fetch }).search(emptyFilters(), 1));
+        assert.strictEqual(error.kind, 'server');
+        assert.strictEqual(error.message, 'Recipe Hub sent a response that is too large.');
+        assert.strictEqual(textCalled, false, 'the body should never be read once content-length exceeds the cap');
+    });
+
+    it('rejects an oversize response body when content-length is absent', async () => {
+        const big = 'x'.repeat(2 * 1024 * 1024 + 1);
+        const { fetch } = stubFetch(() => response(200, big));
+        const error = await rejection(new HubClient({ baseUrl: BASE, fetch }).download(1));
+        assert.strictEqual(error.kind, 'server');
+        assert.strictEqual(error.message, 'Recipe Hub sent a response that is too large.');
+    });
+
+    it('rejects an oversize streamed response body without buffering it all', async () => {
+        const chunk = new TextEncoder().encode('x'.repeat(1024 * 1024));
+        const totalChunks = 3; // 3 MiB, above the 2 MB cap
+        let reads = 0;
+        let cancelled = false;
+        const fetch: FetchLike = async () => ({
+            ok: true,
+            status: 200,
+            body: {
+                getReader: () => ({
+                    read: async () => {
+                        reads += 1;
+                        if (reads > totalChunks) {
+                            return { done: true, value: undefined };
+                        }
+                        return { done: false, value: chunk };
+                    },
+                    cancel: async () => { cancelled = true; },
+                }),
+            },
+            text: async () => { throw new Error('text() should not be called when a body reader is available'); },
+        });
+        const error = await rejection(new HubClient({ baseUrl: BASE, fetch }).search(emptyFilters(), 1));
+        assert.strictEqual(error.kind, 'server');
+        assert.strictEqual(error.message, 'Recipe Hub sent a response that is too large.');
+        assert.ok(reads < totalChunks + 1, 'should stop reading once the cap is exceeded, not drain the whole stream');
+        assert.strictEqual(cancelled, true, 'should cancel the reader once the cap is exceeded');
+    });
 });

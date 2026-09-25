@@ -8,6 +8,8 @@ import { PAGE_SIZE, SearchFilters, toSearchParams } from './search-query';
 
 export const DEFAULT_SERVER_URL = 'https://recipes.cooklang.org';
 export const DEFAULT_TIMEOUT_MS = 15000;
+/** Every endpoint returns small JSON or a small `.cook` file; anything past this is treated as a broken/hostile server. */
+export const MAX_RESPONSE_BYTES = 2 * 1024 * 1024;
 
 export type HubErrorKind = 'network' | 'badQuery' | 'rateLimited' | 'server' | 'notFound';
 
@@ -73,10 +75,25 @@ export interface RecipeDetail {
     feed?: HubFeed;
 }
 
+/** A `ReadableStreamDefaultReader<Uint8Array>`-shaped reader; a real fetch `Response.body.getReader()` satisfies this. */
+export interface ChunkReader {
+    read(): Promise<{ done: boolean; value?: Uint8Array }>;
+    cancel?(reason?: unknown): Promise<void>;
+}
+
+/** A `ReadableStream<Uint8Array>`-shaped body; a real fetch `Response.body` satisfies this. */
+export interface ReadableBodyLike {
+    getReader(): ChunkReader;
+}
+
 /** The part of a fetch `Response` the client reads. */
 export interface FetchResponseLike {
     readonly ok: boolean;
     readonly status: number;
+    /** `Response.headers`; used to reject an oversize body via `content-length` before reading it. */
+    readonly headers?: { get(name: string): string | null };
+    /** `Response.body`; when present, read and capped as a stream so an oversize body is never fully buffered. */
+    readonly body?: ReadableBodyLike | null;
     text(): Promise<string>;
 }
 
@@ -114,12 +131,12 @@ export class HubClient {
     }
 
     async recipe(id: number): Promise<RecipeDetail> {
-        return normalizeDetail(await this.getJson(`/api/recipes/${id}`));
+        return normalizeDetail(await this.getJson(`/api/recipes/${this.requireRecipeId(id)}`));
     }
 
     /** The recipe's Cooklang source. */
     async download(id: number): Promise<string> {
-        return this.get(this.apiUrl(`/api/recipes/${id}/download`), 'text/plain');
+        return this.get(this.apiUrl(`/api/recipes/${this.requireRecipeId(id)}/download`), 'text/plain');
     }
 
     /** Text at an absolute http(s) URL, e.g. a feed's `enclosure_url`. */
@@ -136,6 +153,14 @@ export class HubClient {
             throw new HubError('network', `Invalid Recipe Hub server URL "${this.baseUrl}". Check the recipeHub.serverUrl setting.`);
         }
         return this.baseUrl + pathAndQuery;
+    }
+
+    /** `id`, or a `notFound` `HubError` for anything that cannot be a real recipe id (never reaches `fetch`). */
+    protected requireRecipeId(id: number): number {
+        if (!Number.isSafeInteger(id) || id <= 0) {
+            throw new HubError('notFound', `"${id}" is not a valid recipe id.`);
+        }
+        return id;
     }
 
     protected async getJson(pathAndQuery: string): Promise<unknown> {
@@ -155,8 +180,11 @@ export class HubClient {
             let body: string;
             try {
                 response = await this.fetchImpl(url, { signal: controller.signal, headers: { Accept: accept } });
-                body = await response.text();
+                body = await readCapped(response, MAX_RESPONSE_BYTES);
             } catch (e) {
+                if (e instanceof HubError) {
+                    throw e;
+                }
                 throw networkError(e, controller.signal.aborted);
             }
             if (!response.ok) {
@@ -167,6 +195,58 @@ export class HubClient {
             clearTimeout(timer);
         }
     }
+}
+
+function tooLarge(): HubError {
+    return new HubError('server', 'Recipe Hub sent a response that is too large.');
+}
+
+/**
+ * `response`'s body as text, rejecting anything above `capBytes` before it is
+ * fully held in memory: a declared `content-length` above the cap rejects
+ * without reading at all, and a streamed body (a real fetch `Response.body`)
+ * is rejected as soon as the running total crosses the cap. Only a
+ * response with neither falls back to `text()` and a length check.
+ */
+async function readCapped(response: FetchResponseLike, capBytes: number): Promise<string> {
+    const declared = response.headers?.get('content-length');
+    if (declared !== null && declared !== undefined) {
+        const declaredBytes = Number(declared);
+        if (Number.isFinite(declaredBytes) && declaredBytes > capBytes) {
+            throw tooLarge();
+        }
+    }
+    if (response.body && typeof response.body.getReader === 'function') {
+        return readStreamCapped(response.body, capBytes);
+    }
+    const text = await response.text();
+    if (Buffer.byteLength(text, 'utf8') > capBytes) {
+        throw tooLarge();
+    }
+    return text;
+}
+
+async function readStreamCapped(body: ReadableBodyLike, capBytes: number): Promise<string> {
+    const reader = body.getReader();
+    const chunks: Uint8Array[] = [];
+    let total = 0;
+    for (;;) {
+        const { done, value } = await reader.read();
+        if (done) {
+            break;
+        }
+        if (value) {
+            total += value.byteLength;
+            if (total > capBytes) {
+                if (reader.cancel) {
+                    await reader.cancel().catch(() => undefined);
+                }
+                throw tooLarge();
+            }
+            chunks.push(value);
+        }
+    }
+    return Buffer.concat(chunks.map(chunk => Buffer.from(chunk))).toString('utf8');
 }
 
 function networkError(e: unknown, timedOut: boolean): HubError {
