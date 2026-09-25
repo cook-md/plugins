@@ -1,0 +1,131 @@
+{
+  "name": "recipe-hub",
+  "displayName": "Recipe Hub",
+  "description": "Search the public Cooklang recipe index (recipes.cooklang.org), preview any recipe, and save it to your Drafts. Ships with Cook Editor.",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cook-md/plugins.git",
+    "directory": "recipe-hub"
+  },
+  "keywords": [
+    "cooklang",
+    "recipes",
+    "search",
+    "recipe hub",
+    "federation"
+  ],
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished",
+    "onFileSystem:cooklang-hub"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "recipeHub",
+          "title": "Recipe Hub",
+          "icon": "media/recipe-hub.svg"
+        }
+      ]
+    },
+    "views": {
+      "recipeHub": [
+        {
+          "type": "webview",
+          "id": "recipeHub.view",
+          "name": "Recipe Hub"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Recipe Hub",
+      "properties": {
+        "recipeHub.serverUrl": {
+          "type": "string",
+          "default": "https://recipes.cooklang.org",
+          "description": "Address of the Recipe Hub server to search."
+        }
+      }
+    },
+    "commands": [
+      {
+        "command": "recipeHub.search",
+        "title": "Search Recipes",
+        "category": "Recipe Hub"
+      },
+      {
+        "command": "recipeHub.saveToDrafts",
+        "title": "Save to Drafts",
+        "category": "Recipe Hub",
+        "icon": {
+          "light": "media/save-light.svg",
+          "dark": "media/save-dark.svg"
+        }
+      },
+      {
+        "command": "recipeHub.openSource",
+        "title": "Open Original Recipe",
+        "category": "Recipe Hub",
+        "icon": {
+          "light": "media/external-light.svg",
+          "dark": "media/external-dark.svg"
+        }
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "recipeHub.saveToDrafts",
+          "when": "false"
+        },
+        {
+          "command": "recipeHub.openSource",
+          "when": "false"
+        }
+      ],
+      "cooklang/recipePreview/toolbar": [
+        {
+          "command": "recipeHub.saveToDrafts",
+          "when": "cooklangPreviewScheme == cooklang-hub",
+          "group": "navigation@5"
+        },
+        {
+          "command": "recipeHub.openSource",
+          "when": "cooklangPreviewScheme == cooklang-hub",
+          "group": "navigation@6"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p . && npm run typecheck:webview && npm run bundle:webview",
+    "typecheck:webview": "tsc -p tsconfig.webview.json",
+    "bundle:webview": "esbuild src/webview/main.ts --bundle --format=iife --target=es2020 --outfile=out/webview.js",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath recipe-hub-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^18.19.0",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^3.3.0",
+    "esbuild": "^0.23.0",
+    "mocha": "^10.4.0",
+    "ovsx": "^1.0.0",
+    "typescript": "~5.4.5"
+  }
+}
