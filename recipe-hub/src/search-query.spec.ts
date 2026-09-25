@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import {
-    activeFilterCount, addTerm, clearFilters, emptyFilters, parseFilters, primaryLanguage, resolveDefaultLocale,
-    SearchFilters, toSearchParams,
+    activeFilterCount, addTerm, clearFilters, emptyFilters, MAX_LIST_VALUES, orderServings, parseFilters, primaryLanguage,
+    resolveDefaultLocale, SearchFilters, toSearchParams,
 } from './search-query';
 
 const FULL: SearchFilters = {
@@ -96,11 +96,32 @@ describe('filter helpers', () => {
         assert.deepStrictEqual(addTerm([], '  '), []);
     });
 
+    it('addTerm stops at the server list cap', () => {
+        const full = Array.from({ length: MAX_LIST_VALUES }, (_, index) => `t${index}`);
+        assert.deepStrictEqual(addTerm(full, 'one more'), full);
+        assert.deepStrictEqual(addTerm(full.slice(1), 'one more'), [...full.slice(1), 'one more']);
+    });
+
     it('activeFilterCount counts structured filters only', () => {
         assert.strictEqual(activeFilterCount(emptyFilters()), 0);
         assert.strictEqual(activeFilterCount({ ...emptyFilters('en'), q: 'x', sort: 'newest' }), 1);
         assert.strictEqual(activeFilterCount({ ...emptyFilters(), tags: ['a', 'b'], minServings: 2, maxServings: 4, maxTime: 15 }), 4);
         assert.strictEqual(activeFilterCount(FULL), 10);
+    });
+
+    it('activeFilterCount counts the language only when it differs from the default', () => {
+        assert.strictEqual(activeFilterCount(emptyFilters('en'), 'en'), 0);
+        assert.strictEqual(activeFilterCount(emptyFilters(''), 'en'), 1);
+        assert.strictEqual(activeFilterCount(emptyFilters('de'), 'en'), 1);
+        assert.strictEqual(activeFilterCount(clearFilters(FULL, 'en'), 'en'), 0);
+    });
+
+    it('orderServings swaps a reversed range and leaves the rest alone', () => {
+        assert.deepStrictEqual(orderServings({ ...emptyFilters(), minServings: 6, maxServings: 2 }),
+            { ...emptyFilters(), minServings: 2, maxServings: 6 });
+        assert.deepStrictEqual(orderServings({ ...emptyFilters(), minServings: 2, maxServings: 6 }),
+            { ...emptyFilters(), minServings: 2, maxServings: 6 });
+        assert.deepStrictEqual(orderServings({ ...emptyFilters(), minServings: 6 }), { ...emptyFilters(), minServings: 6 });
     });
 
     it('clearFilters keeps the query and sort', () => {

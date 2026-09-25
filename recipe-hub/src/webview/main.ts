@@ -2,7 +2,8 @@ import type { Facets, HubErrorKind, RecipeCard } from '../hub-client';
 import { isDisplayableImageUrl } from '../hub-urls';
 import type { FromWebview, ToWebview } from '../protocol';
 import {
-    activeFilterCount, addTerm, clearFilters, emptyFilters, MAX_TIME_PRESETS, parseFilters, resolveDefaultLocale, SearchFilters, SortOrder,
+    activeFilterCount, addTerm, clearFilters, emptyFilters, MAX_LIST_VALUES, MAX_TIME_PRESETS, orderServings, parseFilters,
+    resolveDefaultLocale, SearchFilters, SortOrder,
 } from '../search-query';
 
 interface SavedState {
@@ -71,18 +72,33 @@ function button(className: string, text: string, onClick: (event: MouseEvent) =>
     return node;
 }
 
-function termInput(placeholder: string, onAdd: (term: string) => void): HTMLInputElement {
+/** The server rejects lists longer than this, so the UI stops adding at the cap. */
+function isFull(list: readonly string[]): boolean {
+    return list.length >= MAX_LIST_VALUES;
+}
+
+const FULL_PLACEHOLDER = `Up to ${MAX_LIST_VALUES}`;
+
+function termInput(placeholder: string, current: () => readonly string[], onAdd: (term: string) => void): HTMLInputElement {
     const input = element('input', 'term-input');
     input.type = 'text';
     input.placeholder = placeholder;
+    input.dataset.placeholder = placeholder;
     input.setAttribute('aria-label', placeholder);
     input.addEventListener('keydown', event => {
-        if (event.key === 'Enter' && input.value.trim() !== '') {
+        if (event.key === 'Enter' && !event.isComposing && input.value.trim() !== '' && !isFull(current())) {
             onAdd(input.value);
             input.value = '';
         }
     });
     return input;
+}
+
+/** Disables a term input once its list is at the cap. */
+function syncTermInput(input: HTMLInputElement, list: readonly string[]): void {
+    const full = isFull(list);
+    input.disabled = full;
+    input.placeholder = full ? FULL_PLACEHOLDER : input.dataset.placeholder ?? '';
 }
 
 function servingsInput(placeholder: string, onChange: (value: number | undefined) => void): HTMLInputElement {
@@ -146,7 +162,7 @@ searchBox.placeholder = 'Search recipes, e.g. pasta or tags:vegan';
 searchBox.setAttribute('aria-label', 'Search recipes');
 searchBox.addEventListener('input', () => setFilters({ ...filters, q: searchBox.value }));
 searchBox.addEventListener('keydown', event => {
-    if (event.key === 'Enter') { searchNow(); }
+    if (event.key === 'Enter' && !event.isComposing) { searchNow(); }
 });
 
 const queryError = element('div', 'query-error');
@@ -160,17 +176,17 @@ const clearLink = button('link', 'Clear filters', () => clearAllFilters());
 const tagSelect = element('select', 'tag-select');
 tagSelect.setAttribute('aria-label', 'Add a tag');
 tagSelect.addEventListener('change', () => {
-    if (tagSelect.value !== '') {
+    if (tagSelect.value !== '' && !isFull(filters.tags)) {
         setFilters({ ...filters, tags: addTerm(filters.tags, tagSelect.value) });
     }
 });
-const tagInput = termInput('Type a tag', term => setFilters({ ...filters, tags: addTerm(filters.tags, term) }));
+const tagInput = termInput('Type a tag', () => filters.tags, term => setFilters({ ...filters, tags: addTerm(filters.tags, term) }));
 const tagChips = element('div', 'chips');
 
-const includeInput = termInput('Add an ingredient to include', term =>
+const includeInput = termInput('Add an ingredient to include', () => filters.includeIngredients, term =>
     setFilters({ ...filters, includeIngredients: addTerm(filters.includeIngredients, term) }));
 const includeChips = element('div', 'chips');
-const excludeInput = termInput('Add an ingredient to exclude', term =>
+const excludeInput = termInput('Add an ingredient to exclude', () => filters.excludeIngredients, term =>
     setFilters({ ...filters, excludeIngredients: addTerm(filters.excludeIngredients, term) }));
 const excludeChips = element('div', 'chips');
 
@@ -229,7 +245,7 @@ function syncControls(): void {
     if (searchBox.value !== filters.q) {
         searchBox.value = filters.q;
     }
-    const count = activeFilterCount(filters);
+    const count = activeFilterCount(filters, defaultFilterLocale());
     const arrow = element('span', 'filters-arrow', filtersOpen ? '▼' : '▶');
     arrow.setAttribute('aria-hidden', 'true');
     filtersToggle.replaceChildren(arrow, ` Filters${count > 0 ? ` (${count})` : ''}`);
@@ -240,8 +256,13 @@ function syncControls(): void {
     const tagOptions = (facets?.tags ?? [])
         .filter(tag => !filters.tags.includes(tag.name.toLowerCase()))
         .map(tag => [tag.name, `${tag.name} (${tag.count})`] as const);
-    fillSelect(tagSelect, [['', tagOptions.length > 0 ? 'Add a tag…' : 'No tag list available'], ...tagOptions], '');
-    tagSelect.disabled = tagOptions.length === 0;
+    const tagsFull = isFull(filters.tags);
+    const tagPrompt = tagsFull ? FULL_PLACEHOLDER : tagOptions.length > 0 ? 'Add a tag…' : 'No tag list available';
+    fillSelect(tagSelect, [['', tagPrompt], ...(tagsFull ? [] : tagOptions)], '');
+    tagSelect.disabled = tagsFull || tagOptions.length === 0;
+    syncTermInput(tagInput, filters.tags);
+    syncTermInput(includeInput, filters.includeIngredients);
+    syncTermInput(excludeInput, filters.excludeIngredients);
     renderChips(tagChips, filters.tags, tag => setFilters({ ...filters, tags: filters.tags.filter(item => item !== tag) }));
     renderChips(includeChips, filters.includeIngredients, name =>
         setFilters({ ...filters, includeIngredients: filters.includeIngredients.filter(item => item !== name) }));
@@ -280,8 +301,13 @@ function saveState(): void {
     vscode.setState({ filters, filtersOpen, localeTouched });
 }
 
+/** The language a fresh panel searches: the display language, or any if the index has none in it. */
+function defaultFilterLocale(): string {
+    return resolveDefaultLocale(defaultLocale, facets?.locales);
+}
+
 function setFilters(next: SearchFilters): void {
-    filters = next;
+    filters = orderServings(next);
     saveState();
     syncControls();
     scheduleSearch();
@@ -289,8 +315,7 @@ function setFilters(next: SearchFilters): void {
 
 function clearAllFilters(): void {
     localeTouched = false;
-    // Same default as on first load: the display language, or any if the index has none in it.
-    filters = clearFilters(filters, resolveDefaultLocale(defaultLocale, facets?.locales));
+    filters = clearFilters(filters, defaultFilterLocale());
     saveState();
     syncControls();
     searchNow();
@@ -331,7 +356,13 @@ function onResults(message: ResultsMessage): void {
     }
     loading = false;
     searched = true;
-    cards = message.page > 1 ? [...cards, ...message.cards] : message.cards;
+    if (message.page > 1) {
+        // The index can shift between pages; don't show a recipe twice.
+        const shown = new Set(cards.map(card => card.id));
+        cards = [...cards, ...message.cards.filter(card => !shown.has(card.id))];
+    } else {
+        cards = message.cards;
+    }
     total = message.total;
     page = message.page;
     hasMore = message.hasMore;
@@ -381,7 +412,7 @@ function headerContent(): HTMLElement[] {
     }
     if (total === 0) {
         const empty = element('div', 'empty', 'No recipes match your search.');
-        if (activeFilterCount(filters) > 0) {
+        if (activeFilterCount(filters, defaultFilterLocale()) > 0) {
             empty.append(' ', button('link', 'Clear filters', () => clearAllFilters()));
         }
         return [empty];
@@ -405,21 +436,9 @@ function footerContent(): HTMLElement[] {
 
 function renderCard(card: RecipeCard): HTMLElement {
     const node = element('div', 'card');
-    node.tabIndex = 0;
-    node.setAttribute('role', 'button');
-    node.title = `Preview ${card.title}`;
     const open = (): void => vscode.postMessage({ type: 'open', id: card.id, title: card.title });
+    // The title button is the keyboard and screen-reader target; clicking anywhere else on the card is a mouse convenience.
     node.addEventListener('click', open);
-    node.addEventListener('keydown', event => {
-        // Keys on the feed and tag buttons inside the card belong to those buttons.
-        if (event.target !== node) {
-            return;
-        }
-        if (event.key === 'Enter' || event.key === ' ') {
-            event.preventDefault();
-            open();
-        }
-    });
 
     if (card.imageUrl !== undefined && isDisplayableImageUrl(card.imageUrl, serverOrigin)) {
         const image = element('img', 'thumb');
@@ -435,7 +454,12 @@ function renderCard(card: RecipeCard): HTMLElement {
     }
 
     const body = element('div', 'card-body');
-    body.append(element('div', 'card-title', card.title));
+    const title = button('card-title', card.title, event => {
+        event.stopPropagation();
+        open();
+    });
+    title.title = `Preview ${card.title}`;
+    body.append(title);
     if (card.summary !== undefined) {
         body.append(element('div', 'card-summary', card.summary));
     }
@@ -464,7 +488,9 @@ function renderCard(card: RecipeCard): HTMLElement {
         for (const tag of card.tags.slice(0, 3)) {
             const chip = button('tag', tag, event => {
                 event.stopPropagation();
-                setFilters({ ...filters, tags: addTerm(filters.tags, tag) });
+                if (!isFull(filters.tags)) {
+                    setFilters({ ...filters, tags: addTerm(filters.tags, tag) });
+                }
             });
             chip.title = `Only recipes tagged ${tag}`;
             tags.append(chip);

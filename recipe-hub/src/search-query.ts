@@ -53,13 +53,16 @@ export function clearFilters(filters: SearchFilters, defaultLocale: string): Sea
     return { ...emptyFilters(defaultLocale), q: filters.q, sort: filters.sort };
 }
 
-/** How many filters are set. The query text and the sort order are not filters. */
-export function activeFilterCount(filters: SearchFilters): number {
+/**
+ * How many filters differ from the defaults. The query text and the sort order
+ * are not filters; the language counts only when it is not `defaultLocale`.
+ */
+export function activeFilterCount(filters: SearchFilters, defaultLocale = ''): number {
     return filters.tags.length + filters.includeIngredients.length + filters.excludeIngredients.length
         + (filters.maxTime !== undefined ? 1 : 0)
         + (filters.difficulty !== undefined ? 1 : 0)
         + (filters.minServings !== undefined || filters.maxServings !== undefined ? 1 : 0)
-        + (filters.locale !== '' ? 1 : 0)
+        + (filters.locale !== defaultLocale ? 1 : 0)
         + (filters.feed !== undefined ? 1 : 0);
 }
 
@@ -68,13 +71,24 @@ export function normalizeTerm(term: string): string {
     return term.replace(/,/g, ' ').replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
-/** `list` plus the normalised `term`; unchanged when the term is empty or already present. */
+/**
+ * `list` plus the normalised `term`; unchanged when the term is empty, already
+ * present, or the list already holds `MAX_LIST_VALUES` terms.
+ */
 export function addTerm(list: readonly string[], term: string): string[] {
     const normalized = normalizeTerm(term);
-    if (normalized === '' || list.includes(normalized)) {
+    if (normalized === '' || list.includes(normalized) || list.length >= MAX_LIST_VALUES) {
         return [...list];
     }
     return [...list, normalized];
+}
+
+/** Swaps a reversed servings range (min above max) so it still matches something. */
+export function orderServings(filters: SearchFilters): SearchFilters {
+    const { minServings, maxServings } = filters;
+    return minServings !== undefined && maxServings !== undefined && minServings > maxServings
+        ? { ...filters, minServings: maxServings, maxServings: minServings }
+        : filters;
 }
 
 function positiveInteger(value: unknown): number | undefined {
