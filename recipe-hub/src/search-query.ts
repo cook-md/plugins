@@ -18,6 +18,11 @@ export const MAX_TIME_PRESETS: readonly number[] = [15, 30, 60];
  */
 export const MAX_LIST_VALUES = 20;
 
+/** Longest `q` restored from persisted/webview state, well under anything a server would accept. */
+const MAX_QUERY_LENGTH = 500;
+/** Longest feed title restored from persisted/webview state. */
+const MAX_FEED_TITLE_LENGTH = 200;
+
 export interface FeedFilter {
     id: number;
     title: string;
@@ -95,11 +100,12 @@ function positiveInteger(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isInteger(value) && value > 0 ? value : undefined;
 }
 
+/** Deduplicated, normalised terms, capped at MAX_LIST_VALUES so restored state never holds more than toSearchParams would send. */
 function terms(value: unknown): string[] | undefined {
     if (!Array.isArray(value) || !value.every(item => typeof item === 'string')) {
         return undefined;
     }
-    return [...new Set((value as string[]).map(normalizeTerm).filter(term => term !== ''))];
+    return [...new Set((value as string[]).map(normalizeTerm).filter(term => term !== ''))].slice(0, MAX_LIST_VALUES);
 }
 
 /** Query parameters for `GET /api/search`; empty and invalid filters are left out. */
@@ -160,7 +166,9 @@ export function parseFilters(value: unknown): SearchFilters | undefined {
     if (raw.sort !== 'relevance' && raw.sort !== 'newest') {
         return undefined;
     }
-    const filters: SearchFilters = { q: raw.q, tags, includeIngredients, excludeIngredients, locale: raw.locale, sort: raw.sort };
+    const filters: SearchFilters = {
+        q: raw.q.slice(0, MAX_QUERY_LENGTH), tags, includeIngredients, excludeIngredients, locale: raw.locale, sort: raw.sort,
+    };
     const maxTime = positiveInteger(raw.maxTime);
     if (maxTime !== undefined) {
         filters.maxTime = maxTime;
@@ -179,7 +187,7 @@ export function parseFilters(value: unknown): SearchFilters | undefined {
     const feed = raw.feed as { id?: unknown; title?: unknown } | undefined;
     const feedId = typeof feed === 'object' && feed !== null ? positiveInteger(feed.id) : undefined;
     if (feedId !== undefined && typeof feed?.title === 'string') {
-        filters.feed = { id: feedId, title: feed.title };
+        filters.feed = { id: feedId, title: feed.title.slice(0, MAX_FEED_TITLE_LENGTH) };
     }
     return filters;
 }

@@ -87,6 +87,21 @@ describe('parseFilters', () => {
             parseFilters({ ...emptyFilters('en'), maxTime: -5, minServings: 'two', difficulty: ' ', feed: { id: 0, title: 'x' }, tags: [' Vegan', 'vegan'] }),
             { ...emptyFilters('en'), tags: ['vegan'] });
     });
+
+    it('caps list terms at MAX_LIST_VALUES, matching what toSearchParams sends', () => {
+        const many = Array.from({ length: 25 }, (_, i) => `tag${i}`);
+        const filters = parseFilters({ ...emptyFilters(), tags: many, includeIngredients: many, excludeIngredients: many });
+        assert.strictEqual(filters?.tags.length, MAX_LIST_VALUES);
+        assert.strictEqual(filters?.includeIngredients.length, MAX_LIST_VALUES);
+        assert.strictEqual(filters?.excludeIngredients.length, MAX_LIST_VALUES);
+        assert.deepStrictEqual(filters?.tags, many.slice(0, MAX_LIST_VALUES));
+    });
+
+    it('caps q and feed.title length so restored state matches what is sent', () => {
+        const filters = parseFilters({ ...emptyFilters(), q: 'a'.repeat(600), feed: { id: 1, title: 'b'.repeat(300) } });
+        assert.strictEqual(filters?.q.length, 500);
+        assert.strictEqual(filters?.feed?.title.length, 200);
+    });
 });
 
 describe('filter helpers', () => {
