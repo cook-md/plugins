@@ -1,7 +1,8 @@
 import { randomBytes } from 'crypto';
 import * as vscode from 'vscode';
 import { CooklangApi } from './cooklang-api';
-import { isMenuPath, parseAddRecipesRequest, RecipeTarget, resolveTarget, TargetResolver } from './command-args';
+import { isMenuPath, parseAddRecipesRequest, RecipeTarget, resolveTargets, TargetResolver } from './command-args';
+import { ResolvedRecipeReference } from './cooklang-api';
 import { FromWebview, ToWebview, ViewState } from './protocol';
 import { ListFiles, ShoppingListStore } from './shopping-list-store';
 
@@ -36,6 +37,28 @@ class WorkspaceListFiles implements ListFiles {
 function isNotFound(e: unknown): boolean {
     const code = (e as { code?: string }).code;
     return code === 'FileNotFound' || code === 'EntryNotFound' || code === 'ENOENT';
+}
+
+interface ResolvedTarget {
+    target: RecipeTarget;
+    references: ResolvedRecipeReference[];
+}
+
+/** The webview is untrusted input: check shapes before touching the store. */
+function isValidMessage(message: unknown): message is FromWebview {
+    if (typeof message !== 'object' || message === null) {
+        return false;
+    }
+    const m = message as { type?: unknown; index?: unknown; scale?: unknown; name?: unknown };
+    const isIndex = (value: unknown): boolean => Number.isInteger(value) && (value as number) >= 0;
+    switch (m.type) {
+        case 'ready':
+        case 'clear': return true;
+        case 'remove': return isIndex(m.index);
+        case 'scale': return isIndex(m.index) && typeof m.scale === 'number' && Number.isFinite(m.scale) && m.scale > 0;
+        case 'toggle': return typeof m.name === 'string' && m.name.trim() !== '';
+        default: return false;
+    }
 }
 
 /** Owns the store for the first workspace folder, the webview view and the commands. */
@@ -79,7 +102,7 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
 </head>
 <body><div id="root"></div><script nonce="${nonce}" src="${script}"></script></body>
 </html>`;
-        view.webview.onDidReceiveMessage((message: FromWebview) => this.onMessage(message));
+        view.webview.onDidReceiveMessage((message: unknown) => this.onMessage(message));
         view.onDidDispose(() => { this.view = undefined; });
     }
 
@@ -123,59 +146,101 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
         return {
             relativePath: uri => {
                 const resource = vscode.Uri.from({ scheme: uri.scheme, path: uri.path });
-                return vscode.workspace.getWorkspaceFolder(resource) ? vscode.workspace.asRelativePath(resource, false).replace(/\\/g, '/') : undefined;
+                const root = vscode.workspace.workspaceFolders?.[0];
+                const folder = vscode.workspace.getWorkspaceFolder(resource);
+                // The list lives in the first folder only; paths are relative to it.
+                if (!root || !folder || folder.uri.toString() !== root.uri.toString()) {
+                    return undefined;
+                }
+                return vscode.workspace.asRelativePath(resource, false).replace(/\\/g, '/');
             },
             activeUri: () => vscode.window.activeTextEditor?.document.uri,
         };
     }
 
     protected async addRecipe(args: unknown[]): Promise<void> {
-        const target = resolveTarget(args, this.resolver());
-        if (!target || isMenuPath(target.path)) {
-            return;
-        }
-        await this.addTarget(target);
-        await this.reveal();
+        await this.addFromUi(resolveTargets(args, this.resolver()).filter(target => !isMenuPath(target.path)));
     }
 
     protected async addMenu(args: unknown[]): Promise<void> {
-        const target = resolveTarget(args, this.resolver());
-        if (!target || !isMenuPath(target.path)) {
-            return;
-        }
-        await this.addTarget(target);
-        await this.reveal();
+        await this.addFromUi(resolveTargets(args, this.resolver()).filter(target => isMenuPath(target.path)));
     }
 
-    protected async addTarget(target: RecipeTarget): Promise<void> {
+    /** UI path: an empty menu is a warning and is skipped; the others are still added. */
+    protected async addFromUi(targets: RecipeTarget[]): Promise<void> {
+        if (targets.length === 0) {
+            return;
+        }
         const store = this.requireStore();
-        const references = await this.api.resolveRecipeReferences(target.path);
-        if (isMenuPath(target.path)) {
-            if (references.length === 0) {
+        const resolved: ResolvedTarget[] = [];
+        for (const target of targets) {
+            const entry = await this.resolveTarget(target);
+            if (entry) {
+                resolved.push(entry);
+            } else {
                 vscode.window.showWarningMessage(`${target.path} has no recipe references to add.`);
-                return;
             }
+        }
+        for (const entry of resolved) {
+            await this.addResolved(store, entry);
+        }
+        if (resolved.length > 0) {
+            await this.reveal();
+        }
+    }
+
+    /** References of one target; undefined for a menu without recipe references. */
+    protected async resolveTarget(target: RecipeTarget): Promise<ResolvedTarget | undefined> {
+        const references = await this.api.resolveRecipeReferences(target.path);
+        if (isMenuPath(target.path) && references.length === 0) {
+            return undefined;
+        }
+        return { target, references };
+    }
+
+    protected async addResolved(store: ShoppingListStore, { target, references }: ResolvedTarget): Promise<void> {
+        if (isMenuPath(target.path)) {
             await store.addMenu(target.path, target.scale, references);
         } else {
             await store.addRecipe(target.path, target.scale, references);
         }
     }
 
-    /** Programmatic entry point (Cookbot). Returns the live list; throws with a message on bad input. */
+    /**
+     * Programmatic entry point (Cookbot). Resolves every target before adding
+     * any, so a bad entry fails without a partial add. Returns the live list;
+     * rejects with a message on bad input or when the list cannot be built.
+     */
     protected async addRecipes(arg: unknown): Promise<unknown> {
         const request = parseAddRecipesRequest(arg);
         if ('error' in request) {
             throw new Error(request.error);
         }
+        const store = this.requireStore();
         const targets = 'menu' in request ? [{ path: request.menu, scale: 1 }] : request.recipes;
+        const resolved: ResolvedTarget[] = [];
         for (const target of targets) {
-            await this.addTarget(target);
+            const entry = await this.resolveTarget(target);
+            if (!entry) {
+                throw new Error(`${target.path} has no recipe references to add.`);
+            }
+            resolved.push(entry);
+        }
+        for (const entry of resolved) {
+            await this.addResolved(store, entry);
         }
         await this.reveal();
-        return this.store?.getResult();
+        const error = store.getError();
+        if (error) {
+            throw new Error(error);
+        }
+        return store.getResult();
     }
 
-    protected async onMessage(message: FromWebview): Promise<void> {
+    protected async onMessage(message: unknown): Promise<void> {
+        if (!isValidMessage(message)) {
+            return;
+        }
         if (message.type === 'ready') {
             this.postState();
             return;
@@ -189,7 +254,7 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
                 case 'remove': return store.removeRecipe(message.index);
                 case 'scale': return store.updateScale(message.index, message.scale);
                 case 'clear': return store.clearAll();
-                case 'toggle': return store.isChecked(message.name) ? store.uncheckItem(message.name) : store.checkItem(message.name);
+                case 'toggle': return store.toggleItem(message.name);
             }
         });
     }

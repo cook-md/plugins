@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { isMenuPath, parseAddRecipesRequest, resolveTarget, ResourceUri } from './command-args';
+import { isMenuPath, parseAddRecipesRequest, resolveTarget, resolveTargets, ResourceUri } from './command-args';
 
 const uri = (path: string): ResourceUri => ({ scheme: 'file', path });
 const resolver = (active?: ResourceUri) => ({
@@ -29,6 +29,27 @@ describe('resolveTarget', () => {
     it('returns undefined outside the workspace or with nothing to add', () => {
         assert.strictEqual(resolveTarget([uri('/elsewhere/Cake.cook')], resolver()), undefined);
         assert.strictEqual(resolveTarget([], resolver()), undefined);
+    });
+});
+
+describe('resolveTargets', () => {
+    it('returns every resource of an explorer multi-selection, dropping ones outside the workspace', () => {
+        const clicked = uri('/ws/Soup.cook');
+        assert.deepStrictEqual(resolveTargets([clicked, [clicked, uri('/ws/Week.menu'), uri('/elsewhere/Cake.cook')]], resolver()), [
+            { path: 'Soup.cook', scale: 1 },
+            { path: 'Week.menu', scale: 1 },
+        ]);
+    });
+
+    it('falls back to the single target for other invocations', () => {
+        assert.deepStrictEqual(resolveTargets([{ version: 1, uri: 'x', path: 'a.cook', scale: 2 }], resolver()), [{ path: 'a.cook', scale: 2 }]);
+        assert.deepStrictEqual(resolveTargets([uri('/ws/Soup.cook'), []], resolver()), [{ path: 'Soup.cook', scale: 1 }]);
+        assert.deepStrictEqual(resolveTargets([], resolver(uri('/ws/Soup.cook'))), [{ path: 'Soup.cook', scale: 1 }]);
+    });
+
+    it('returns nothing when there is nothing to add', () => {
+        assert.deepStrictEqual(resolveTargets([], resolver()), []);
+        assert.deepStrictEqual(resolveTargets([uri('/elsewhere/Cake.cook')], resolver()), []);
     });
 });
 

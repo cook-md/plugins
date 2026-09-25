@@ -255,6 +255,13 @@ describe('ShoppingListStore', () => {
         assert.strictEqual(store.isChecked('flour'), true);
     });
 
+    it('toggleItem decides inside the queue: two concurrent toggles check then uncheck', async () => {
+        const { store, files } = makeStore();
+        await Promise.all([store.toggleItem('flour'), store.toggleItem('flour')]);
+        assert.strictEqual(store.isChecked('flour'), false);
+        assert.strictEqual(files.files.get(CHECKED_FILE), '+ flour\n- flour\n');
+    });
+
     it('keeps both of two concurrent checks', async () => {
         const { store, files } = makeStore();
         await Promise.all([store.checkItem('flour'), store.checkItem('milk')]);

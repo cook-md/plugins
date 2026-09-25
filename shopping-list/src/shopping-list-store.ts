@@ -101,6 +101,11 @@ export class ShoppingListStore {
         return this.enqueue(() => this.appendCheckEntry({ type: 'unchecked', name }));
     }
 
+    /** Flips the checked state, deciding inside the queue so concurrent toggles see each other's result. */
+    toggleItem(name: string): Promise<void> {
+        return this.enqueue(() => this.appendCheckEntry({ type: this.isChecked(name) ? 'unchecked' : 'checked', name }));
+    }
+
     protected async doLoad(): Promise<void> {
         let listError: string | undefined;
         let text: string | undefined;

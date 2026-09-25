@@ -59,6 +59,28 @@ export function resolveTarget(args: readonly unknown[], resolver: TargetResolver
     return path === undefined ? undefined : { path, scale: 1 };
 }
 
+/**
+ * Every recipe or menu a command should act on. The explorer passes
+ * `(clicked, selected[])`; with a multi-selection all selected resources are
+ * returned (those outside the workspace dropped). Otherwise this is
+ * `resolveTarget` as a zero- or one-element list.
+ */
+export function resolveTargets(args: readonly unknown[], resolver: TargetResolver): RecipeTarget[] {
+    const selection = args[1];
+    if (Array.isArray(selection) && selection.length > 0 && selection.every(isResourceUri)) {
+        const targets: RecipeTarget[] = [];
+        for (const uri of selection) {
+            const path = resolver.relativePath(uri);
+            if (path !== undefined) {
+                targets.push({ path, scale: 1 });
+            }
+        }
+        return targets;
+    }
+    const target = resolveTarget(args, resolver);
+    return target ? [target] : [];
+}
+
 export function isMenuPath(path: string): boolean {
     return /\.menu$/i.test(path);
 }
