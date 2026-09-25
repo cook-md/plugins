@@ -2,7 +2,7 @@
   "name": "shopping-list",
   "displayName": "Shopping List",
   "description": "Aisle-grouped shopping lists from Cooklang recipes and menus, with pantry subtraction. Ships with Cook Editor.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cooklang",
   "license": "MIT",
   "repository": {
@@ -10,22 +10,40 @@
     "url": "https://github.com/cook-md/plugins.git",
     "directory": "shopping-list"
   },
-  "keywords": ["cooklang", "shopping list", "groceries", "recipes", "meal-planning"],
+  "keywords": [
+    "cooklang",
+    "shopping list",
+    "groceries",
+    "recipes",
+    "meal-planning"
+  ],
   "engines": {
     "vscode": "^1.100.0"
   },
-  "categories": ["Other"],
+  "categories": [
+    "Other"
+  ],
   "main": "./out/extension.js",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "viewsContainers": {
-      "activitybar": [
-        { "id": "shoppingList", "title": "Shopping List", "icon": "media/cart.svg" }
+      "right": [
+        {
+          "id": "shoppingList",
+          "title": "Shopping List",
+          "icon": "media/cart.svg"
+        }
       ]
     },
     "views": {
       "shoppingList": [
-        { "type": "webview", "id": "shoppingList.view", "name": "Shopping List" }
+        {
+          "type": "webview",
+          "id": "shoppingList.view",
+          "name": "Shopping List"
+        }
       ]
     },
     "commands": [
@@ -38,13 +56,19 @@
         "command": "shoppingList.addRecipe",
         "title": "Add to Shopping List",
         "category": "Shopping List",
-        "icon": { "light": "media/cart-light.svg", "dark": "media/cart-dark.svg" }
+        "icon": {
+          "light": "media/cart-light.svg",
+          "dark": "media/cart-dark.svg"
+        }
       },
       {
         "command": "shoppingList.addMenu",
         "title": "Add Menu to Shopping List",
         "category": "Shopping List",
-        "icon": { "light": "media/cart-light.svg", "dark": "media/cart-dark.svg" }
+        "icon": {
+          "light": "media/cart-light.svg",
+          "dark": "media/cart-dark.svg"
+        }
       },
       {
         "command": "shoppingList.addRecipes",
@@ -59,26 +83,60 @@
     ],
     "menus": {
       "commandPalette": [
-        { "command": "shoppingList.addRecipes", "when": "false" },
-        { "command": "shoppingList.addRecipe", "when": "editorLangId == cooklang" },
-        { "command": "shoppingList.addMenu", "when": "resourceExtname =~ /^\\.menu$/i" }
+        {
+          "command": "shoppingList.addRecipes",
+          "when": "false"
+        },
+        {
+          "command": "shoppingList.addRecipe",
+          "when": "editorLangId == cooklang"
+        },
+        {
+          "command": "shoppingList.addMenu",
+          "when": "resourceExtname =~ /^\\.menu$/i"
+        }
       ],
       "cooklang/recipePreview/toolbar": [
-        { "command": "shoppingList.addRecipe", "group": "navigation@10" }
+        {
+          "command": "shoppingList.addRecipe",
+          "group": "navigation@10"
+        }
       ],
       "cooklang/menuPreview/toolbar": [
-        { "command": "shoppingList.addMenu", "group": "navigation@10" }
+        {
+          "command": "shoppingList.addMenu",
+          "group": "navigation@10"
+        }
       ],
       "explorer/context": [
-        { "command": "shoppingList.addRecipe", "when": "resourceExtname =~ /^\\.cook$/i", "group": "navigation@90" },
-        { "command": "shoppingList.addMenu", "when": "resourceExtname =~ /^\\.menu$/i", "group": "navigation@90" }
+        {
+          "command": "shoppingList.addRecipe",
+          "when": "resourceExtname =~ /^\\.cook$/i",
+          "group": "navigation@90"
+        },
+        {
+          "command": "shoppingList.addMenu",
+          "when": "resourceExtname =~ /^\\.menu$/i",
+          "group": "navigation@90"
+        }
       ],
       "editor/title": [
-        { "command": "shoppingList.addRecipe", "when": "editorLangId == cooklang", "group": "navigation@10" },
-        { "command": "shoppingList.addMenu", "when": "resourceExtname =~ /^\\.menu$/i", "group": "navigation@10" }
+        {
+          "command": "shoppingList.addRecipe",
+          "when": "editorLangId == cooklang",
+          "group": "navigation@10"
+        },
+        {
+          "command": "shoppingList.addMenu",
+          "when": "resourceExtname =~ /^\\.menu$/i",
+          "group": "navigation@10"
+        }
       ],
       "view/title": [
-        { "command": "shoppingList.clear", "when": "view == shoppingList.view" }
+        {
+          "command": "shoppingList.clear",
+          "when": "view == shoppingList.view"
+        }
       ]
     }
   },
