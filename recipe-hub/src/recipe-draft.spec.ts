@@ -61,6 +61,17 @@ describe('legacyMetadataToFrontmatter', () => {
         assert.strictEqual(legacyMetadataToFrontmatter(loneDivider),
             '---\nservings: 4\n---\nSome step.\n---\nMore text.\n');
     });
+
+    it('leaves >> [key] config directives (parser modes, e.g. cooklang-rs MODES) out of frontmatter, unchanged in the body', () => {
+        const withConfig = '>> servings: 4\n>> [mode]: ingredients\n\nBoil @pasta{400%g}.\n';
+        assert.strictEqual(legacyMetadataToFrontmatter(withConfig),
+            '---\nservings: 4\n---\n>> [mode]: ingredients\n\nBoil @pasta{400%g}.\n');
+    });
+
+    it('leaves content unchanged when only >> [key] config directives are present (nothing to convert)', () => {
+        const onlyConfig = '>> [mode]: ingredients\n\nBoil @pasta{400%g}.\n';
+        assert.strictEqual(legacyMetadataToFrontmatter(onlyConfig), onlyConfig);
+    });
 });
 
 describe('yamlScalar', () => {

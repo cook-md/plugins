@@ -43,6 +43,13 @@ const LEGACY_METADATA = /^>>\s*([^:]+?)\s*:\s*(.*?)\s*$/;
  * the last value, matching cooklang-rs (`event_consumer.rs`: each `>>` line
  * is a plain map insert, so a later value for the same key overwrites the
  * earlier one).
+ *
+ * `>> [key]: value` lines (e.g. `>> [mode]: ingredients`) are not metadata:
+ * cooklang-rs's `MODES` extension (`parser/mod.rs`, `analysis/event_consumer.rs`)
+ * treats a bracketed key as a parser config directive — it sets parsing
+ * options (define/duplicate mode) and is never inserted into the metadata
+ * map. They are left out of the frontmatter conversion and kept in the body
+ * unchanged, where cooklang-rs still recognises and applies them.
  */
 export function legacyMetadataToFrontmatter(content: string): string {
     const stripped = content.replace(/^﻿/, '');
@@ -54,7 +61,7 @@ export function legacyMetadataToFrontmatter(content: string): string {
     const body: string[] = [];
     for (const line of lines) {
         const match = LEGACY_METADATA.exec(line);
-        if (match) {
+        if (match && !isConfigKey(match[1])) {
             entries.set(match[1], match[2]);
         } else {
             body.push(line);
@@ -68,6 +75,11 @@ export function legacyMetadataToFrontmatter(content: string): string {
     }
     const yaml = [...entries].map(([key, value]) => `${yamlScalar(key)}: ${yamlScalar(value)}`);
     return ['---', ...yaml, '---', ...body].join('\n');
+}
+
+/** `[key]`: a cooklang-rs `MODES` config directive (`[mode]`, `[define]`, `[duplicate]`, …), not a metadata key. */
+function isConfigKey(key: string): boolean {
+    return key.startsWith('[') && key.endsWith(']');
 }
 
 /**
