@@ -34,6 +34,10 @@ export class ShoppingListStore {
     protected regenerationSeq = 0;
     protected reloadTimer: ReturnType<typeof setTimeout> | undefined;
     protected disposed = false;
+    /** Serializes loads and mutations so read-modify-write sequences never interleave. */
+    protected queue: Promise<void> = Promise.resolve();
+    /** Set when `.shopping-list` exists but cannot be parsed; list-saving mutations refuse to run. */
+    protected listUnreadable = false;
     protected readonly listeners = new Set<() => void>();
 
     constructor(protected readonly files: ListFiles, protected readonly api: CooklangApi) { }
@@ -64,13 +68,56 @@ export class ShoppingListStore {
         return this.checkedSet.has(name.toLowerCase());
     }
 
-    async load(): Promise<void> {
+    load(): Promise<void> {
+        return this.enqueue(() => this.doLoad());
+    }
+
+    addRecipe(path: string, scale = 1, references?: readonly ResolvedRecipeReference[]): Promise<void> {
+        return this.enqueue(() => this.doAddRecipe(path, scale, references));
+    }
+
+    /** A menu is one top-level item whose children are its recipes (each with its own references). */
+    addMenu(path: string, scale: number, recipes: readonly ResolvedRecipeReference[]): Promise<void> {
+        return this.enqueue(() => this.doAddRecipe(path, scale, recipes));
+    }
+
+    removeRecipe(index: number): Promise<void> {
+        return this.enqueue(() => this.doRemoveRecipe(index));
+    }
+
+    updateScale(index: number, scale: number): Promise<void> {
+        return this.enqueue(() => this.doUpdateScale(index, scale));
+    }
+
+    clearAll(): Promise<void> {
+        return this.enqueue(() => this.doClearAll());
+    }
+
+    checkItem(name: string): Promise<void> {
+        return this.enqueue(() => this.appendCheckEntry({ type: 'checked', name }));
+    }
+
+    uncheckItem(name: string): Promise<void> {
+        return this.enqueue(() => this.appendCheckEntry({ type: 'unchecked', name }));
+    }
+
+    protected async doLoad(): Promise<void> {
+        let listError: string | undefined;
+        let text: string | undefined;
         try {
-            const text = await this.files.read(LIST_FILE);
-            this.list = text === undefined ? { items: [] } : await this.api.parseShoppingList(text);
+            text = await this.files.read(LIST_FILE);
         } catch (e) {
             console.error('[shopping-list] Failed to read .shopping-list:', e);
+        }
+        try {
+            this.list = text === undefined ? { items: [] } : await this.api.parseShoppingList(text);
+            this.listUnreadable = false;
+        } catch (e) {
+            console.error('[shopping-list] Failed to parse .shopping-list:', e);
+            const message = e instanceof Error ? e.message : String(e);
+            listError = `Could not read ${LIST_FILE}: ${message}. Fix or delete the file.`;
             this.list = { items: [] };
+            this.listUnreadable = true;
         }
         try {
             const text = await this.files.read(CHECKED_FILE);
@@ -80,7 +127,12 @@ export class ShoppingListStore {
             this.checkedLog = [];
         }
         this.checkedSet = checkedSetOf(this.checkedLog);
-        if (this.list.items.length > 0) {
+        if (listError !== undefined) {
+            ++this.regenerationSeq;
+            this.result = undefined;
+            this.error = listError;
+            this.fire();
+        } else if (this.list.items.length > 0) {
             await this.regenerate();
         } else {
             this.result = undefined;
@@ -89,7 +141,8 @@ export class ShoppingListStore {
         }
     }
 
-    async addRecipe(path: string, scale = 1, references?: readonly ResolvedRecipeReference[]): Promise<void> {
+    protected async doAddRecipe(path: string, scale: number, references?: readonly ResolvedRecipeReference[]): Promise<void> {
+        this.assertListWritable();
         this.list.items.push({
             type: 'recipe',
             path,
@@ -100,12 +153,8 @@ export class ShoppingListStore {
         await this.regenerate();
     }
 
-    /** A menu is one top-level item whose children are its recipes (each with its own references). */
-    async addMenu(path: string, scale: number, recipes: readonly ResolvedRecipeReference[]): Promise<void> {
-        await this.addRecipe(path, scale, recipes);
-    }
-
-    async removeRecipe(index: number): Promise<void> {
+    protected async doRemoveRecipe(index: number): Promise<void> {
+        this.assertListWritable();
         if (index < 0 || index >= this.list.items.length) {
             return;
         }
@@ -115,7 +164,8 @@ export class ShoppingListStore {
         await this.compactCheckedLog();
     }
 
-    async updateScale(index: number, scale: number): Promise<void> {
+    protected async doUpdateScale(index: number, scale: number): Promise<void> {
+        this.assertListWritable();
         if (index < 0 || index >= this.list.items.length) {
             return;
         }
@@ -124,9 +174,10 @@ export class ShoppingListStore {
         await this.regenerate();
     }
 
-    async clearAll(): Promise<void> {
+    protected async doClearAll(): Promise<void> {
         // Invalidate any in-flight regenerate() so it cannot resurrect the result.
         ++this.regenerationSeq;
+        this.listUnreadable = false;
         this.list = { items: [] };
         this.checkedLog = [];
         this.checkedSet = new Set();
@@ -137,16 +188,12 @@ export class ShoppingListStore {
         this.fire();
     }
 
-    async checkItem(name: string): Promise<void> {
-        await this.appendCheckEntry({ type: 'checked', name });
-    }
-
-    async uncheckItem(name: string): Promise<void> {
-        await this.appendCheckEntry({ type: 'unchecked', name });
-    }
-
     async regenerate(): Promise<void> {
         const seq = ++this.regenerationSeq;
+        if (this.listUnreadable) {
+            // Keep the "could not read" error visible until the file is fixed or cleared.
+            return;
+        }
         if (this.list.items.length === 0) {
             this.result = undefined;
             this.error = undefined;
@@ -205,6 +252,19 @@ export class ShoppingListStore {
         };
         this.list.items.forEach(item => walk(item, 1));
         return out;
+    }
+
+    protected enqueue<T>(work: () => Promise<T>): Promise<T> {
+        const run = this.queue.then(work);
+        // Keep the queue alive when a unit of work fails; the caller still sees the rejection.
+        this.queue = run.then(() => undefined, () => undefined);
+        return run;
+    }
+
+    protected assertListWritable(): void {
+        if (this.listUnreadable) {
+            throw new Error(this.error ?? `Could not read ${LIST_FILE}. Fix or delete the file.`);
+        }
     }
 
     protected async save(): Promise<void> {

@@ -23,6 +23,9 @@ class FakeApi extends CooklangApi {
         return this.generate(recipes);
     }
     override async parseShoppingList(text: string): Promise<ShoppingListFile> {
+        if (text.trim() === 'GARBAGE') {
+            throw new Error('unexpected token');
+        }
         return { items: text.split('\n').filter(line => line.trim()).map(line => ({ type: 'recipe', path: line.trim(), children: [] })) };
     }
     override async writeShoppingList(list: ShoppingListFile): Promise<string> {
@@ -250,5 +253,64 @@ describe('ShoppingListStore', () => {
         await sleep(30);
         assert.deepStrictEqual(store.getItems().map(item => item.path), ['pasta.cook']);
         assert.strictEqual(store.isChecked('flour'), true);
+    });
+
+    it('keeps both of two concurrent checks', async () => {
+        const { store, files } = makeStore();
+        await Promise.all([store.checkItem('flour'), store.checkItem('milk')]);
+        const checked = files.files.get(CHECKED_FILE) ?? '';
+        assert.strictEqual(checked.includes('+ flour'), true);
+        assert.strictEqual(checked.includes('+ milk'), true);
+        assert.strictEqual(store.isChecked('flour'), true);
+        assert.strictEqual(store.isChecked('milk'), true);
+    });
+
+    it('never overwrites an unreadable .shopping-list', async () => {
+        const { store, files } = makeStore();
+        files.files.set(LIST_FILE, 'GARBAGE');
+        await store.load();
+        assert.match(store.getError() ?? '', /\.shopping-list/);
+        await store.regenerate();
+        assert.match(store.getError() ?? '', /\.shopping-list/);
+        await assert.rejects(store.addRecipe('pasta.cook', 1), /\.shopping-list/);
+        await assert.rejects(store.updateScale(0, 2), /\.shopping-list/);
+        await assert.rejects(store.removeRecipe(0), /\.shopping-list/);
+        assert.strictEqual(files.files.get(LIST_FILE), 'GARBAGE');
+        await store.clearAll();
+        await store.addRecipe('pasta.cook', 1);
+        assert.strictEqual(files.files.get(LIST_FILE), 'pasta.cook\n');
+    });
+
+    it('a successful load clears the unreadable state', async () => {
+        const { store, files } = makeStore();
+        files.files.set(LIST_FILE, 'GARBAGE');
+        await store.load();
+        files.files.set(LIST_FILE, 'pasta.cook\n');
+        await store.load();
+        assert.strictEqual(store.getError(), undefined);
+        await store.addRecipe('soup.cook', 1);
+        assert.strictEqual(files.files.get(LIST_FILE), 'pasta.cook\nsoup.cook\n');
+    });
+
+    it('discards a stale regenerate result', async () => {
+        const { store, api } = makeStore();
+        await store.addRecipe('pasta.cook', 1);
+        let releaseFirst: () => void = () => undefined;
+        const firstGate = new Promise<void>(resolve => { releaseFirst = resolve; });
+        let call = 0;
+        api.generate = async () => {
+            call += 1;
+            if (call === 1) {
+                await firstGate;
+                return { categories: [], other: { name: 'other', items: [{ name: 'stale', quantities: '' }] }, pantryItems: [] };
+            }
+            return { categories: [], other: { name: 'other', items: [{ name: 'fresh', quantities: '' }] }, pantryItems: [] };
+        };
+        const first = store.regenerate();
+        const second = store.regenerate();
+        await second;
+        releaseFirst();
+        await first;
+        assert.strictEqual(store.getResult()?.other.items[0].name, 'fresh');
     });
 });
