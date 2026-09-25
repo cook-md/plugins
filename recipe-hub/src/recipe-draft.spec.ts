@@ -40,15 +40,26 @@ describe('buildSaveDraftArgs', () => {
 });
 
 describe('legacyMetadataToFrontmatter', () => {
-    it('turns >> metadata into YAML frontmatter, keeping the first value of a key', () => {
+    it('turns >> metadata into YAML frontmatter, keeping the last value of a repeated key at its first position', () => {
         assert.strictEqual(legacyMetadataToFrontmatter(LEGACY),
-            '---\nservings: 4\nsource: "https://blog.example/pasta"\n---\nBoil @pasta{400%g}.\n');
+            '---\nservings: 6\nsource: "https://blog.example/pasta"\n---\nBoil @pasta{400%g}.\n');
     });
 
     it('leaves YAML frontmatter and metadata-free recipes unchanged', () => {
         const yaml = '---\ntitle: Soup\n---\n>> not: converted\nBoil @water.\n';
         assert.strictEqual(legacyMetadataToFrontmatter(yaml), yaml);
         assert.strictEqual(legacyMetadataToFrontmatter('Boil @water.\n'), 'Boil @water.\n');
+    });
+
+    it('does not convert >> lines when frontmatter fences exist anywhere, even after a leading blank line', () => {
+        const withLeadingBlank = '\n---\ntitle: Soup\n---\n>> not: converted\nBoil @water.\n';
+        assert.strictEqual(legacyMetadataToFrontmatter(withLeadingBlank), withLeadingBlank);
+    });
+
+    it('converts >> lines when the body has only one lone --- divider (no closing fence)', () => {
+        const loneDivider = '>> servings: 4\n\nSome step.\n---\nMore text.\n';
+        assert.strictEqual(legacyMetadataToFrontmatter(loneDivider),
+            '---\nservings: 4\n---\nSome step.\n---\nMore text.\n');
     });
 });
 
