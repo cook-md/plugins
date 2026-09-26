@@ -58,7 +58,7 @@ export class AllergenBadgeProvider {
         }
         // A badge is about to be computed: earlier failures are superseded.
         this.logged.clear();
-        const findings = findAllergens(standard ? settings.classes : [], settings.customWords, output.names, output.ingredients);
+        const findings = findAllergens(standard ? settings.classes : [], settings.customWords, output);
         return badgeFor(findings, wantsStandard && !standard, settings.showWhenLocked);
     }
 

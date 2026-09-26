@@ -19,7 +19,7 @@ describe('findAllergens', () => {
     const names = ['soy sauce', 'butter', 'parmesan', 'saffron', 'fresh coriander'];
 
     it('collects hits for ticked classes only, in class order, then custom words', () => {
-        const findings = findAllergens(cls('milk', 'gluten'), ['coriander'], names, ingredients);
+        const findings = findAllergens(cls('milk', 'gluten'), ['coriander'], { names, refs: [], ingredients });
         assert.deepStrictEqual(findings.pillLabels, ['Gluten', 'Milk', 'coriander']);
         assert.deepStrictEqual(findings.lines, [
             { label: 'Wheat', ingredients: ['soy sauce'] },
@@ -30,8 +30,22 @@ describe('findAllergens', () => {
     });
 
     it('reports no unknowns when no class is checked', () => {
-        const findings = findAllergens([], ['kiwi'], names, undefined);
+        const findings = findAllergens([], ['kiwi'], { names, refs: [], ingredients: undefined });
         assert.deepStrictEqual(findings, { pillLabels: [], lines: [], unknown: [] });
+    });
+
+    it('matches custom words against linked recipes too, but still reports them as unchecked', () => {
+        const findings = findAllergens([], ['pesto'], { names, refs: ['Pesto'], ingredients: undefined });
+        assert.deepStrictEqual(findings.pillLabels, ['pesto']);
+        assert.deepStrictEqual(findings.lines, [{ label: 'pesto', ingredients: ['Pesto'] }]);
+        assert.deepStrictEqual(findings.unknown, ['Pesto (linked recipe)']);
+    });
+
+    it('always lists linked recipes as unchecked, after the service unknowns', () => {
+        const withClasses = findAllergens(cls('milk'), [], { names, refs: ['Pesto', 'Pesto'], ingredients });
+        assert.deepStrictEqual(withClasses.unknown, ['saffron', 'Pesto (linked recipe)']);
+        const customOnly = findAllergens([], ['kiwi'], { names, refs: ['Hollandaise'], ingredients: undefined });
+        assert.deepStrictEqual(customOnly.unknown, ['Hollandaise (linked recipe)']);
     });
 });
 

@@ -1,5 +1,5 @@
 import { AllergenClass } from './allergen-classes';
-import { IngredientAllergens } from './allergen-template';
+import { AllergenOutput } from './allergen-template';
 import { PillBadge } from './cooklang-api';
 import { matchCustomWords } from './custom-match';
 import { AllergenFindings, LOCKED_TOOLTIP, hoverMarkdown } from './hover';
@@ -10,15 +10,17 @@ const WARNING_TEXT = '⚠ Check allergens';
 const LOCKED_TEXT = '🔒 Allergens';
 
 /**
- * `classes`: ticked classes the service checked (empty when it didn't). `ingredients`: the
- * service's per-ingredient data, undefined for the names-only template.
+ * `classes`: ticked classes the service checked (empty when it didn't). `output.ingredients`:
+ * the service's per-ingredient data, undefined for the names-only template. Linked recipes
+ * (`output.refs`) are matched against custom words by name, but their contents are never
+ * checked, so they are always reported as unknown while anything is being looked for.
  */
 export function findAllergens(
     classes: readonly AllergenClass[],
     customWords: readonly string[],
-    names: readonly string[],
-    ingredients: readonly IngredientAllergens[] | undefined,
+    output: Readonly<AllergenOutput>,
 ): AllergenFindings {
+    const { names, refs, ingredients } = output;
     const findings: AllergenFindings = { pillLabels: [], lines: [], unknown: [] };
     for (const allergenClass of classes) {
         const byLabel = new Map<string, string[]>();
@@ -41,13 +43,18 @@ export function findAllergens(
             }
         }
     }
-    for (const match of matchCustomWords(customWords, names)) {
+    for (const match of matchCustomWords(customWords, [...names, ...refs])) {
         findings.pillLabels.push(match.word);
         findings.lines.push({ label: match.word, ingredients: match.ingredients });
     }
+    const unknown: string[] = [];
     if (classes.length > 0 && ingredients) {
-        findings.unknown = [...new Set(ingredients.filter(i => i.status === 'unknown').map(i => i.name))];
+        unknown.push(...ingredients.filter(i => i.status === 'unknown').map(i => i.name));
     }
+    if (classes.length > 0 || customWords.length > 0) {
+        unknown.push(...refs.map(ref => `${ref} (linked recipe)`));
+    }
+    findings.unknown = [...new Set(unknown)];
     return findings;
 }
 

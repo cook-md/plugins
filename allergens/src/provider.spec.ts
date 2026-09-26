@@ -13,6 +13,7 @@ const standardOutput: PluginReportResult = {
     ok: true,
     output: JSON.stringify({
         names: ['butter', 'saffron', 'coriander'],
+        refs: [],
         aggregate: {
             items: [
                 { ingredient: 'butter', allergens: { status: 'verified', contains: [{ class: 'milk', label: 'Milk' }], view: 'eu' } },
@@ -23,7 +24,7 @@ const standardOutput: PluginReportResult = {
         },
     }),
 };
-const namesOutput: PluginReportResult = { ok: true, output: JSON.stringify({ names: ['butter', 'saffron', 'coriander'] }) };
+const namesOutput: PluginReportResult = { ok: true, output: JSON.stringify({ names: ['butter', 'saffron', 'coriander'], refs: [] }) };
 
 function setup(options: { values: Record<string, unknown>; feature?: boolean; results?: PluginReportResult[] }): {
     provider: AllergenBadgeProvider; templates: string[]; logs: string[]; featureChecks: number;
@@ -67,6 +68,13 @@ describe('AllergenBadgeProvider', () => {
         const badge = await s.provider.provide(CONTEXT);
         assert.strictEqual(badge?.text, '⚠ butter');
         assert.deepStrictEqual([s.templates, s.featureChecks], [[NAMES_TEMPLATE], 0]);
+    });
+
+    it('warns about linked recipes even when only custom words are set', async () => {
+        const s = setup({ values: { custom: ['kiwi'] }, results: [{ ok: true, output: JSON.stringify({ names: ['butter'], refs: ['Pesto'] }) }] });
+        const badge = await s.provider.provide(CONTEXT);
+        assert.deepStrictEqual([badge?.tone, badge?.text], ['warning', '⚠ Check allergens']);
+        assert.ok(badge?.tooltipMarkdown.includes("Couldn't check: Pesto \\(linked recipe\\)"), badge?.tooltipMarkdown);
     });
 
     it('shows the locked pill without rendering when the plan lacks nutrition and there are no custom words', async () => {

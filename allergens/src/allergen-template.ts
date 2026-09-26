@@ -2,25 +2,28 @@
 // validation of what comes back. Output is untrusted: every field is checked.
 
 /**
- * Recipe ingredient names in the order `aggregate_nutrition` sends them: recipe
- * references skipped (the leading `?` of optional ingredients is stripped in
- * `parseAllergenOutput`). `names[i]` is therefore the i-th item sent to the service.
+ * `names`: recipe ingredient names in the order `aggregate_nutrition` sends them, recipe
+ * references skipped, so `names[i]` is the i-th item sent to the service. `refs`: the
+ * skipped recipe references (linked recipes), whose contents are never checked. The leading
+ * `?` of optional ingredients is stripped in `parseAllergenOutput`.
  */
 const NAMES_PRELUDE = [
     '{%- set names = namespace(list=[]) -%}',
+    '{%- set refs = namespace(list=[]) -%}',
     '{%- for ing in ingredients -%}',
-    '{%- if not ing.reference -%}{%- set names.list = names.list + [ing.name | string] -%}{%- endif -%}',
+    '{%- if ing.reference -%}{%- set refs.list = refs.list + [ing.name | string] -%}',
+    '{%- else -%}{%- set names.list = names.list + [ing.name | string] -%}{%- endif -%}',
     '{%- endfor -%}',
 ].join('\n');
 
 /** Ingredient names only: no nutrition call, works signed out. */
-export const NAMES_TEMPLATE = `${NAMES_PRELUDE}\n{{ {"names": names.list} | tojson }}`;
+export const NAMES_TEMPLATE = `${NAMES_PRELUDE}\n{{ {"names": names.list, "refs": refs.list} | tojson }}`;
 
 /** Names plus the `/aggregate` response in the EU allergen view (all 14 classes). */
 export const STANDARD_TEMPLATE = [
     NAMES_PRELUDE,
     '{%- set agg = aggregate_nutrition(ingredients, "eu") -%}',
-    '{{ {"names": names.list, "aggregate": agg} | tojson }}',
+    '{{ {"names": names.list, "refs": refs.list, "aggregate": agg} | tojson }}',
 ].join('\n');
 
 export interface AllergenEntry {
@@ -39,6 +42,8 @@ export interface IngredientAllergens {
 
 export interface AllergenOutput {
     names: string[];
+    /** Linked recipes (`@./Other recipe{}`): never checked, so always reported as unknown. */
+    refs: string[];
     /** Undefined for the names-only template. */
     ingredients: IngredientAllergens[] | undefined;
 }
@@ -88,6 +93,15 @@ function alignIngredients(names: string[], aggregate: unknown): IngredientAllerg
     ];
 }
 
+function isStringArray(value: unknown): value is string[] {
+    return Array.isArray(value) && value.every(entry => typeof entry === 'string');
+}
+
+/** Strips every leading `?` (optional-ingredient marker) and surrounding whitespace. */
+function cleanName(name: string): string {
+    return name.replace(/^\?+/, '').trim();
+}
+
 /** `standard`: the output came from `STANDARD_TEMPLATE`. Undefined when the output is malformed. */
 export function parseAllergenOutput(output: string, standard: boolean): AllergenOutput | undefined {
     let data: unknown;
@@ -96,13 +110,14 @@ export function parseAllergenOutput(output: string, standard: boolean): Allergen
     } catch {
         return undefined;
     }
-    if (!isPlainObject(data) || !Array.isArray(data.names) || !data.names.every(name => typeof name === 'string')) {
+    if (!isPlainObject(data) || !isStringArray(data.names) || !isStringArray(data.refs)) {
         return undefined;
     }
-    const names = (data.names as string[]).map(name => name.replace(/^\?/, '').trim());
+    const names = data.names.map(cleanName);
+    const refs = data.refs.map(cleanName);
     if (!standard) {
-        return { names, ingredients: undefined };
+        return { names, refs, ingredients: undefined };
     }
     const ingredients = alignIngredients(names, data.aggregate);
-    return ingredients ? { names, ingredients } : undefined;
+    return ingredients ? { names, refs, ingredients } : undefined;
 }

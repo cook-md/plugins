@@ -14,17 +14,30 @@ describe('templates', () => {
     it('the standard template asks for the EU view', () => {
         assert.ok(STANDARD_TEMPLATE.includes('aggregate_nutrition(ingredients, "eu")'));
     });
+
+    it('both templates emit linked recipes as refs', () => {
+        for (const template of [NAMES_TEMPLATE, STANDARD_TEMPLATE]) {
+            assert.ok(template.includes('"refs": refs.list'), template);
+        }
+    });
 });
 
 describe('parseAllergenOutput', () => {
-    it('reads names only for the names template, stripping `?` and whitespace', () => {
-        const parsed = parseAllergenOutput(JSON.stringify({ names: ['?salt ', 'butter'] }), false);
-        assert.deepStrictEqual(parsed, { names: ['salt', 'butter'], ingredients: undefined });
+    it('reads names and linked recipes for the names template, stripping every leading `?` and whitespace', () => {
+        const parsed = parseAllergenOutput(JSON.stringify({ names: ['?salt ', '??pepper', 'butter'], refs: ['?? Pesto '] }), false);
+        assert.deepStrictEqual(parsed, { names: ['salt', 'pepper', 'butter'], refs: ['Pesto'], ingredients: undefined });
+    });
+
+    it('requires refs to be a string array', () => {
+        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [] }), false), undefined);
+        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [], refs: [1] }), false), undefined);
+        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [], refs: 'x' }), false), undefined);
     });
 
     it('aligns items and failures back to recipe names', () => {
         const output = JSON.stringify({
             names: ['plain flour', 'almonds', 'unobtainium', 'butter'],
+            refs: [],
             aggregate: {
                 items: [
                     item('flour', { status: 'unverified', contains: [], view: 'eu' }),
@@ -45,6 +58,7 @@ describe('parseAllergenOutput', () => {
     it('falls back to service names when counts do not line up', () => {
         const output = JSON.stringify({
             names: ['a', 'b', 'c'],
+            refs: [],
             aggregate: { items: [item('egg', verified({ class: 'eggs', label: 'Eggs' }))], failures: [{ index: 1, ingredient: 'zzz' }] },
         });
         assert.deepStrictEqual(parseAllergenOutput(output, true)?.ingredients, [
@@ -56,6 +70,7 @@ describe('parseAllergenOutput', () => {
     it('treats a missing or malformed allergens block as unknown and drops malformed entries', () => {
         const output = JSON.stringify({
             names: ['x', 'y', 'z'],
+            refs: [],
             aggregate: {
                 items: [
                     item('x'),
@@ -75,6 +90,7 @@ describe('parseAllergenOutput', () => {
     it('treats a null allergens block as unknown', () => {
         const output = JSON.stringify({
             names: ['x'],
+            refs: [],
             aggregate: { items: [item('x', null)], failures: [] },
         });
         assert.deepStrictEqual(parseAllergenOutput(output, true)?.ingredients, [
@@ -84,8 +100,8 @@ describe('parseAllergenOutput', () => {
 
     it('rejects output that is not what the template produces', () => {
         assert.strictEqual(parseAllergenOutput('not json', false), undefined);
-        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [1] }), false), undefined);
-        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [] }), true), undefined);
-        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [], aggregate: { items: {} , failures: [] } }), true), undefined);
+        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [1], refs: [] }), false), undefined);
+        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [], refs: [] }), true), undefined);
+        assert.strictEqual(parseAllergenOutput(JSON.stringify({ names: [], refs: [], aggregate: { items: {}, failures: [] } }), true), undefined);
     });
 });
