@@ -28,11 +28,13 @@ function isName(value: unknown): boolean {
     return typeof value === 'string' && value.trim() !== '';
 }
 
+const ATTRIBUTE_KEYS = new Set(['quantity', 'bought', 'expire', 'low']);
+
 function isAttributes(value: unknown): boolean {
     if (typeof value !== 'object' || value === null || Array.isArray(value)) {
         return false;
     }
-    return Object.values(value).every(v => typeof v === 'string');
+    return Object.entries(value).every(([key, v]) => ATTRIBUTE_KEYS.has(key) && typeof v === 'string');
 }
 
 /** The webview is untrusted input: check shapes before touching the store. */

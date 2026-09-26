@@ -135,20 +135,34 @@ export class PantryController implements vscode.WebviewViewProvider {
         if (!store) {
             return;
         }
-        await this.handle(store, message);
+        try {
+            await this.handle(store, message);
+        } catch (e) {
+            vscode.window.showErrorMessage(`Pantry: ${e instanceof Error ? e.message : String(e)}`);
+        }
     }
 
     protected async handle(store: PantryStore, message: Exclude<FromWebview, { type: 'ready' | 'openFile' }>): Promise<void> {
         switch (message.type) {
             case 'create': return store.create();
             case 'dismissError': return store.dismissEditError();
-            case 'add': return store.edit({ op: 'add', section: message.section, name: message.name, ...message.attributes });
-            case 'update': return store.edit({ op: 'update', section: message.section, name: message.name, fields: message.fields });
+            case 'add': {
+                const section = message.section.trim();
+                const name = message.name.trim();
+                return store.edit({ ...message.attributes, op: 'add', section, name });
+            }
+            case 'update': {
+                const section = message.section.trim();
+                const name = message.name.trim();
+                return store.edit({ op: 'update', section, name, fields: message.fields });
+            }
             case 'remove': {
+                const section = message.section.trim();
+                const name = message.name.trim();
                 const choice = await vscode.window.showWarningMessage(
-                    `Remove "${message.name}" from ${message.section}?`, { modal: true }, 'Remove');
+                    `Remove "${name}" from ${section}?`, { modal: true }, 'Remove');
                 if (choice === 'Remove') {
-                    await store.edit({ op: 'remove', section: message.section, name: message.name });
+                    await store.edit({ op: 'remove', section, name });
                 }
                 return;
             }

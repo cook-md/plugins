@@ -21,6 +21,8 @@ describe('isValidMessage', () => {
             { type: 'add', section: 'fridge', name: 'milk' },
             { type: 'add', section: 'fridge', name: 'milk', attributes: { quantity: 1 } },
             { type: 'update', section: 'fridge', name: 'milk', fields: [] },
+            { type: 'add', section: 'fridge', name: 'milk', attributes: { op: 'remove' } },
+            { type: 'update', section: 'fridge', name: 'milk', fields: { shelf: 'x' } },
         ]) {
             assert.strictEqual(isValidMessage(message), false, JSON.stringify(message));
         }
