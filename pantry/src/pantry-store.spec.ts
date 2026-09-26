@@ -6,11 +6,13 @@ class FakeFiles implements PantryFiles {
     text: string | undefined;
     writes: string[] = [];
     failRead = false;
+    failWrite = false;
     async read(): Promise<string | undefined> {
         if (this.failRead) { throw new Error('EACCES'); }
         return this.text;
     }
     async write(text: string): Promise<void> {
+        if (this.failWrite) { throw new Error('EACCES write'); }
         this.text = text;
         this.writes.push(text);
     }
@@ -111,6 +113,35 @@ describe('PantryStore', () => {
         const { store } = makeStore();
         await store.edit({ op: 'add', section: 'fridge', name: 'milk' });
         assert.strictEqual(store.getEditError(), 'There is no config/pantry.conf to edit.');
+    });
+
+    it('keeps a throwing listener from breaking edit() or blocking other listeners', async () => {
+        const { store, files } = makeStore();
+        files.text = '';
+        let calls = 0;
+        store.onDidChange(() => { calls++; throw new Error('boom'); });
+        store.onDidChange(() => { calls++; });
+        await store.edit({ op: 'add', section: 'fridge', name: 'milk' });
+        assert.strictEqual(calls, 2);
+        assert.strictEqual(store.getEditError(), undefined);
+    });
+
+    it('skips the write when an edit does not change the file text', async () => {
+        const { store, files } = makeStore();
+        files.text = 'fridge/milk\n';
+        const writesBefore = files.writes.length;
+        await store.edit({ op: 'update', section: 'fridge', name: 'milk', fields: {} });
+        assert.strictEqual(files.writes.length, writesBefore);
+        assert.strictEqual(store.getEditError(), undefined);
+        assert.strictEqual(store.getState().kind, 'loaded');
+    });
+
+    it('does not reject when create() fails to write, and reports the edit error instead', async () => {
+        const { store, files } = makeStore();
+        files.failWrite = true;
+        await store.create();
+        assert.strictEqual(store.getEditError(), 'EACCES write');
+        assert.strictEqual(store.getState().kind, 'noFile');
     });
 
     it('notifies listeners and debounces scheduled reloads', async () => {

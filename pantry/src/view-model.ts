@@ -90,7 +90,7 @@ export function storedQuantity(input: string): string {
     if (trimmed.includes('%')) {
         return trimmed;
     }
-    const match = /^([\d.,/]+)\s+(\S.*)$/.exec(trimmed);
+    const match = /^(\d[\d.,/]*)\s+(\S+)$/.exec(trimmed);
     return match ? `${match[1]}%${match[2]}` : trimmed;
 }
 

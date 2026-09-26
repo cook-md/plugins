@@ -67,6 +67,8 @@ describe('view-model', () => {
         assert.strictEqual(storedQuantity('6'), '6');
         assert.strictEqual(storedQuantity('a pinch'), 'a pinch');
         assert.strictEqual(storedQuantity(''), '');
+        assert.strictEqual(storedQuantity('2 large eggs'), '2 large eggs');
+        assert.strictEqual(storedQuantity('1 1/2 cup'), '1 1/2 cup');
     });
 
     it('labels expiry relative to today', () => {

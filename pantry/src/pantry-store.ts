@@ -65,11 +65,16 @@ export class PantryStore {
         return this.enqueue(() => this.doLoad());
     }
 
-    /** Writes the starter file if there is no pantry yet. */
+    /** Never rejects: a failure becomes `getEditError()`. Writes the starter file if there is no pantry yet. */
     create(): Promise<void> {
         return this.enqueue(async () => {
-            if (await this.files.read() === undefined) {
-                await this.files.write(STARTER_PANTRY);
+            try {
+                if (await this.files.read() === undefined) {
+                    await this.files.write(STARTER_PANTRY);
+                }
+                this.editError = undefined;
+            } catch (e) {
+                this.editError = messageOf(e);
             }
             await this.doLoad();
         });
@@ -83,7 +88,10 @@ export class PantryStore {
                 if (text === undefined) {
                     throw new Error(`There is no ${PANTRY_FILE} to edit.`);
                 }
-                await this.files.write(await this.api.editPantry(text, edit));
+                const newText = await this.api.editPantry(text, edit);
+                if (newText !== text) {
+                    await this.files.write(newText);
+                }
                 this.editError = undefined;
             } catch (e) {
                 this.editError = messageOf(e);
@@ -151,6 +159,12 @@ export class PantryStore {
         if (this.disposed) {
             return;
         }
-        this.listeners.forEach(listener => listener());
+        this.listeners.forEach(listener => {
+            try {
+                listener();
+            } catch (e) {
+                console.error('[pantry] listener failed:', e);
+            }
+        });
     }
 }
