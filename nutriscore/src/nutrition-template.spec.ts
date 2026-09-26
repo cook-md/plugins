@@ -14,8 +14,8 @@ const aggregate = {
 
 describe('nutritionTemplate', () => {
     it('embeds the category slugs and returns JSON through tojson', () => {
-        const template = nutritionTemplate(['fruit', 'vegetable']);
-        assert.ok(template.startsWith('{%- set categories = ["fruit","vegetable"] -%}'));
+        const template = nutritionTemplate(['fruits', 'vegetables']);
+        assert.ok(template.startsWith('{%- set categories = ["fruits","vegetables"] -%}'));
         assert.ok(template.includes('aggregate_nutrition(ingredients)'));
         assert.ok(template.trimEnd().endsWith('{{ {"aggregate": agg, "categoryIngredients": found.names} | tojson }}'));
     });

@@ -8,9 +8,12 @@ const root = path.resolve(__dirname, '..');
 const editor = process.env.COOK_EDITOR_DIR ?? path.resolve(root, '../../editor');
 const target = path.join(editor, 'plugins/cooklang.nutriscore');
 
+// Skips test specs and source maps, which the packaged plugin doesn't need.
+const skipTestArtifacts = src => !/\.spec\.js$|\.map$/.test(src);
+
 fs.rmSync(target, { recursive: true, force: true });
 fs.mkdirSync(target, { recursive: true });
 for (const entry of ['package.json', 'out', 'README.md', 'LICENSE']) {
-    fs.cpSync(path.join(root, entry), path.join(target, entry), { recursive: true });
+    fs.cpSync(path.join(root, entry), path.join(target, entry), { recursive: true, filter: skipTestArtifacts });
 }
 console.log(`Deployed to ${target}`);
