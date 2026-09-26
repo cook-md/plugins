@@ -56,6 +56,7 @@ function fvlPoints(percent: number): number {
     return percent > 40 ? 1 : 0;
 }
 
+/** Maps a Nutri-Score (negative minus positive points) to its 2023 letter grade. */
 export function gradeFor(score: number): NutriGrade {
     if (score <= 0) {
         return 'A';
@@ -69,6 +70,7 @@ export function gradeFor(score: number): NutriGrade {
     return score <= 18 ? 'D' : 'E';
 }
 
+/** Computes the 2023 Nutri-Score for general foods from per-100 g values. */
 export function nutriScore(values: Per100g): NutriScoreResult {
     const negative = points(values.energyKj, ENERGY_KJ) + points(values.sugarsG, SUGARS_G)
         + points(values.satFatG, SAT_FAT_G) + points(values.saltG, SALT_G);

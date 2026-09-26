@@ -42,4 +42,8 @@ describe('toPer100g', () => {
     it('caps the fruit/veg share at 100 %', () => {
         assert.strictEqual(toPer100g(aggregate(100), 150)!.fvlPercent, 100);
     });
+
+    it('returns undefined when a computed field is not finite', () => {
+        assert.strictEqual(toPer100g(aggregate(100), NaN), undefined);
+    });
 });

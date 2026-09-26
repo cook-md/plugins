@@ -11,7 +11,7 @@ export type PluginReportResult =
     | { ok: false; reason: 'unauthenticated' | 'forbidden' | 'network' | 'server' | 'template'; message: string };
 
 export interface PreviewOutletContext {
-    version: number;
+    version: 1;
     uri: string;
     path: string;
     scale: number;

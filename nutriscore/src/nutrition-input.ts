@@ -23,7 +23,7 @@ export function toPer100g(aggregate: NutritionAggregate, categoryMassG: number |
         : macros.kcal * KJ_PER_KCAL;
     const sodiumKey = SODIUM_KEYS.find(key => typeof aggregate.totals.micros[key] === 'number');
     const sodiumMg = sodiumKey ? aggregate.totals.micros[sodiumKey] : 0;
-    return {
+    const values: Per100g = {
         energyKj: energyKj * factor,
         sugarsG: macros.sugar_g * factor,
         satFatG: macros.sat_fat_g * factor,
@@ -32,4 +32,6 @@ export function toPer100g(aggregate: NutritionAggregate, categoryMassG: number |
         fibreG: macros.fiber_g * factor,
         fvlPercent: Math.min(100, ((categoryMassG ?? 0) / mass) * 100),
     };
+    // Defence in depth: a NaN/Infinity anywhere (e.g. a malformed categoryMassG) should not silently score.
+    return Object.values(values).every(Number.isFinite) ? values : undefined;
 }
