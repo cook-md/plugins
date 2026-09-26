@@ -71,7 +71,7 @@ export function visibleSections(sections: readonly PantrySection[], search: stri
     const needle = search.trim().toLowerCase();
     const narrowing = needle !== '' || filter !== 'all';
     return sections
-        .map((section) => ({
+        .map(section => ({
             name: section.name,
             total: section.items.length,
             items: section.items.filter(item => item.name.toLowerCase().includes(needle) && matchesFilter(item, filter, today)),
