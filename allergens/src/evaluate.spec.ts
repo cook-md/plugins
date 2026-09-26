@@ -1,0 +1,78 @@
+import * as assert from 'assert';
+import { ALLERGEN_CLASSES } from './allergen-classes';
+import { IngredientAllergens } from './allergen-template';
+import { badgeFor, findAllergens, pillText } from './evaluate';
+import { LOCKED_TOOLTIP } from './hover';
+
+const cls = (...slugs: string[]) => ALLERGEN_CLASSES.filter(c => slugs.includes(c.slug));
+const verified = (name: string, ...contains: IngredientAllergens['contains']): IngredientAllergens => ({ name, status: 'verified', contains });
+const unknown = (name: string): IngredientAllergens => ({ name, status: 'unknown', contains: [] });
+
+describe('findAllergens', () => {
+    const ingredients = [
+        verified('soy sauce', { class: 'gluten', subtype: 'wheat', label: 'Wheat' }, { class: 'soybeans', label: 'Soybeans' }),
+        verified('butter', { class: 'milk', label: 'Milk' }),
+        verified('parmesan', { class: 'milk', label: 'Milk' }),
+        unknown('saffron'),
+        unknown('saffron'),
+    ];
+    const names = ['soy sauce', 'butter', 'parmesan', 'saffron', 'fresh coriander'];
+
+    it('collects hits for ticked classes only, in class order, then custom words', () => {
+        const findings = findAllergens(cls('milk', 'gluten'), ['coriander'], names, ingredients);
+        assert.deepStrictEqual(findings.pillLabels, ['Gluten', 'Milk', 'coriander']);
+        assert.deepStrictEqual(findings.lines, [
+            { label: 'Wheat', ingredients: ['soy sauce'] },
+            { label: 'Milk', ingredients: ['butter', 'parmesan'] },
+            { label: 'coriander', ingredients: ['fresh coriander'] },
+        ]);
+        assert.deepStrictEqual(findings.unknown, ['saffron']);
+    });
+
+    it('reports no unknowns when no class is checked', () => {
+        const findings = findAllergens([], ['kiwi'], names, undefined);
+        assert.deepStrictEqual(findings, { pillLabels: [], lines: [], unknown: [] });
+    });
+});
+
+describe('pillText', () => {
+    it('fits as many labels as possible into 24 characters', () => {
+        assert.strictEqual(pillText(['Milk']), '⚠ Milk');
+        assert.strictEqual(pillText(['Milk', 'Tree nuts']), '⚠ Milk, Tree nuts');
+        assert.strictEqual(pillText(['Milk', 'Tree nuts', 'Sesame']), '⚠ Milk, Tree nuts +1');
+        for (const text of [pillText(['Crustaceans', 'Sulphites', 'Molluscs', 'Mustard']), pillText(['x'.repeat(40), 'Milk'])]) {
+            assert.ok(text.length <= 24, text);
+        }
+        assert.strictEqual(pillText(['x'.repeat(40), 'Milk']), `⚠ ${'x'.repeat(18)}… +1`);
+    });
+});
+
+describe('badgeFor', () => {
+    const hit = { pillLabels: ['Milk'], lines: [{ label: 'Milk', ingredients: ['butter'] }], unknown: [] };
+    const unsure = { pillLabels: [], lines: [], unknown: ['saffron'] };
+    const clear = { pillLabels: [], lines: [], unknown: [] };
+
+    it('flags hits in red', () => {
+        const badge = badgeFor(hit, false, true);
+        assert.strictEqual(badge?.tone, 'bad');
+        assert.strictEqual(badge?.text, '⚠ Milk');
+    });
+
+    it('warns in amber when nothing matched but something could not be checked', () => {
+        assert.deepStrictEqual([badgeFor(unsure, false, true)?.tone, badgeFor(unsure, false, true)?.text], ['warning', '⚠ Check allergens']);
+    });
+
+    it('shows nothing when everything was checked and nothing matched', () => {
+        assert.strictEqual(badgeFor(clear, false, true), undefined);
+    });
+
+    it('shows the locked pill when standard classes could not be checked', () => {
+        assert.deepStrictEqual(badgeFor(clear, true, true), { kind: 'pill', text: '🔒 Allergens', tone: 'neutral', tooltipMarkdown: LOCKED_TOOLTIP });
+        assert.strictEqual(badgeFor(clear, true, false), undefined);
+    });
+
+    it('adds the locked line to a red pill unless the hint is disabled', () => {
+        assert.ok(badgeFor(hit, true, true)?.tooltipMarkdown.includes('Cook Basic or Pro'));
+        assert.ok(!badgeFor(hit, true, false)?.tooltipMarkdown.includes('Cook Basic or Pro'));
+    });
+});
