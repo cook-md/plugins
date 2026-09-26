@@ -6,3 +6,4 @@ package-lock.json
 out/**/*.spec.js
 out/**/*.map
 **/.DS_Store
+test-fixtures/**

@@ -64,26 +64,98 @@ describe('parseAllergenOutput', () => {
         assert.deepStrictEqual(parseAllergenOutput(output, true)?.ingredients, [
             { name: 'egg', status: 'verified', contains: [{ class: 'eggs', label: 'Eggs' }] },
             { name: 'zzz', status: 'unknown', contains: [] },
+            { name: "some ingredients (the nutrition service's reply didn't line up)", status: 'unknown', contains: [] },
         ]);
     });
 
-    it('treats a missing or malformed allergens block as unknown and drops malformed entries', () => {
+    it('treats a missing allergens block, or any malformed entry, as unknown', () => {
         const output = JSON.stringify({
-            names: ['x', 'y', 'z'],
+            names: ['x', 'y', 'z', 'w'],
             refs: [],
             aggregate: {
                 items: [
                     item('x'),
-                    item('y', { status: 'verified', contains: [{ class: 'milk' }, { class: 'eggs', label: 'Eggs', subtype: 3 }, 'nope'] }),
-                    item('z', { status: 'verified', contains: [{ class: 'gluten', subtype: null, label: 'Wheat' }], subtype: null }),
+                    item('y', { status: 'verified', contains: [{ class: 'milk' }, { class: 'eggs', label: 'Eggs' }], view: 'eu' }),
+                    item('z', { status: 'verified', contains: ['nope'], view: 'eu' }),
+                    item('w', { status: 'verified', contains: [{ class: 'gluten', label: 3 }], view: 'eu' }),
                 ],
                 failures: [],
             },
         });
         assert.deepStrictEqual(parseAllergenOutput(output, true)?.ingredients, [
             { name: 'x', status: 'unknown', contains: [] },
+            { name: 'y', status: 'unknown', contains: [{ class: 'eggs', label: 'Eggs' }] },
+            { name: 'z', status: 'unknown', contains: [] },
+            { name: 'w', status: 'unknown', contains: [] },
+        ]);
+    });
+
+    it('omits a null or non-string subtype but keeps the entry', () => {
+        const output = JSON.stringify({
+            names: ['y', 'z'],
+            refs: [],
+            aggregate: {
+                items: [
+                    item('y', verified({ class: 'eggs', label: 'Eggs', subtype: 3 } as never)),
+                    item('z', verified({ class: 'gluten', subtype: null, label: 'Wheat' } as never)),
+                ],
+                failures: [],
+            },
+        });
+        assert.deepStrictEqual(parseAllergenOutput(output, true)?.ingredients, [
             { name: 'y', status: 'verified', contains: [{ class: 'eggs', label: 'Eggs' }] },
             { name: 'z', status: 'verified', contains: [{ class: 'gluten', label: 'Wheat' }] },
+        ]);
+    });
+
+    it('treats an allergens block in any view but EU as unknown', () => {
+        const output = JSON.stringify({
+            names: ['celery', 'milk', 'none'],
+            refs: [],
+            aggregate: {
+                items: [
+                    item('celery', { status: 'verified', contains: [], view: 'fda' }),
+                    item('milk', { status: 'verified', contains: [{ class: 'milk', label: 'Milk' }], view: 'fda' }),
+                    item('none', { status: 'verified', contains: [] }),
+                ],
+                failures: [],
+            },
+        });
+        assert.deepStrictEqual(parseAllergenOutput(output, true)?.ingredients?.map(i => i.status), ['unknown', 'unknown', 'unknown']);
+    });
+
+    it('adds a sentinel unknown when the fallback has fewer results than ingredients', () => {
+        const output = JSON.stringify({
+            names: ['a', 'b', 'c', 'd'],
+            refs: [],
+            aggregate: { items: [item('egg', verified({ class: 'eggs', label: 'Eggs' })), { amount: {} }], failures: [{ index: 9, ingredient: 'zzz' }] },
+        });
+        assert.deepStrictEqual(parseAllergenOutput(output, true)?.ingredients, [
+            { name: 'egg', status: 'verified', contains: [{ class: 'eggs', label: 'Eggs' }] },
+            { name: 'zzz', status: 'unknown', contains: [] },
+            { name: "some ingredients (the nutrition service's reply didn't line up)", status: 'unknown', contains: [] },
+        ]);
+    });
+
+    it('keeps failures without an ingredient name', () => {
+        const aligned = JSON.stringify({
+            names: ['a', 'b'],
+            refs: [],
+            aggregate: { items: [item('a', verified())], failures: [{ index: 1 }] },
+        });
+        assert.deepStrictEqual(parseAllergenOutput(aligned, true)?.ingredients, [
+            { name: 'a', status: 'verified', contains: [] },
+            { name: 'b', status: 'unknown', contains: [] },
+        ]);
+        const fallback = JSON.stringify({
+            names: ['a', 'b', 'c'],
+            refs: [],
+            aggregate: { items: [], failures: [{ index: 1 }, { index: 'x' }, { index: 1, ingredient: 'bb' }] },
+        });
+        assert.deepStrictEqual(parseAllergenOutput(fallback, true)?.ingredients, [
+            { name: 'ingredient 2', status: 'unknown', contains: [] },
+            { name: 'an unnamed ingredient', status: 'unknown', contains: [] },
+            { name: 'bb', status: 'unknown', contains: [] },
         ]);
     });
 

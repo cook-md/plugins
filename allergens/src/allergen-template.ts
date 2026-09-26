@@ -52,24 +52,46 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
     return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+/** Undefined when malformed (no string `class` or `label`); a non-string `subtype` is omitted. */
 function toEntry(value: unknown): AllergenEntry | undefined {
     if (!isPlainObject(value) || typeof value.class !== 'string' || typeof value.label !== 'string') {
         return undefined;
     }
-    if (value.subtype !== undefined && typeof value.subtype !== 'string') {
-        return { class: value.class, label: value.label };
-    }
-    return value.subtype === undefined
-        ? { class: value.class, label: value.label }
-        : { class: value.class, subtype: value.subtype, label: value.label };
+    return typeof value.subtype === 'string'
+        ? { class: value.class, subtype: value.subtype, label: value.label }
+        : { class: value.class, label: value.label };
 }
 
+/**
+ * Only a verified block in the EU view counts: in any other view (e.g. the service silently
+ * answering in FDA's) EU-only classes such as celery would look absent. A single malformed
+ * entry makes the whole ingredient unknown; its well-formed entries are kept so hits still show.
+ */
 function allergensOf(block: unknown): Pick<IngredientAllergens, 'status' | 'contains'> {
-    if (!isPlainObject(block) || block.status !== 'verified' || !Array.isArray(block.contains)) {
+    if (!isPlainObject(block) || block.status !== 'verified' || block.view !== 'eu' || !Array.isArray(block.contains)) {
         return { status: 'unknown', contains: [] };
     }
-    const contains = block.contains.map(toEntry).filter((entry): entry is AllergenEntry => entry !== undefined);
-    return { status: 'verified', contains };
+    const entries = block.contains.map(toEntry);
+    const contains = entries.filter((entry): entry is AllergenEntry => entry !== undefined);
+    return { status: contains.length === entries.length ? 'verified' : 'unknown', contains };
+}
+
+/** Stands in for results the service dropped when its reply can't be aligned to the recipe. */
+const MISALIGNED_NAME = "some ingredients (the nutrition service's reply didn't line up)";
+
+function unknownIngredient(name: string): IngredientAllergens {
+    return { name, status: 'unknown', contains: [] };
+}
+
+function isValidIndex(index: unknown, length: number): index is number {
+    return Number.isInteger(index) && (index as number) >= 0 && (index as number) < length;
+}
+
+function failureName(failure: Record<string, unknown>, length: number): string {
+    if (typeof failure.ingredient === 'string') {
+        return failure.ingredient;
+    }
+    return isValidIndex(failure.index, length) ? `ingredient ${failure.index + 1}` : 'an unnamed ingredient';
 }
 
 function alignIngredients(names: string[], aggregate: unknown): IngredientAllergens[] | undefined {
@@ -77,20 +99,22 @@ function alignIngredients(names: string[], aggregate: unknown): IngredientAllerg
         return undefined;
     }
     const items = aggregate.items.filter(isPlainObject).filter(item => typeof item.ingredient === 'string');
-    const failures = aggregate.failures.filter(isPlainObject).filter(failure => typeof failure.ingredient === 'string');
-    const failedIndices = new Set(failures
-        .map(failure => failure.index)
-        .filter((index): index is number => Number.isInteger(index) && (index as number) >= 0 && (index as number) < names.length));
+    const failures = aggregate.failures.filter(isPlainObject);
+    const failedIndices = new Set(failures.map(failure => failure.index).filter(index => isValidIndex(index, names.length)));
     if (items.length + failures.length === names.length && failedIndices.size === failures.length) {
         let next = 0;
         return names.map((name, index) => failedIndices.has(index)
-            ? { name, status: 'unknown', contains: [] }
+            ? unknownIngredient(name)
             : { name, ...allergensOf(items[next++].allergens) });
     }
-    return [
+    const fallback: IngredientAllergens[] = [
         ...items.map(item => ({ name: item.ingredient as string, ...allergensOf(item.allergens) })),
-        ...failures.map(failure => ({ name: failure.ingredient as string, status: 'unknown' as const, contains: [] })),
+        ...failures.map(failure => unknownIngredient(failureName(failure, names.length))),
     ];
+    if (fallback.length < names.length) {
+        fallback.push(unknownIngredient(MISALIGNED_NAME));
+    }
+    return fallback;
 }
 
 function isStringArray(value: unknown): value is string[] {
