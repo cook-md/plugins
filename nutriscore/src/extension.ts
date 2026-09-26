@@ -11,7 +11,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         () => Promise.resolve(vscode.commands.getCommands(true)),
     );
     const supportCheck = new SupportCheck(api);
-    const provider = new NutriScoreBadgeProvider(api, message => output.appendLine(message));
+    const provider = new NutriScoreBadgeProvider(
+        api,
+        message => output.appendLine(message),
+        () => vscode.workspace.getConfiguration('nutriscore').get<boolean>('showWhenLocked', true),
+    );
     context.subscriptions.push(vscode.commands.registerCommand('cooklang.nutriscore.provideBadge', async (outletContext: unknown) => {
         const supported = await supportCheck.isSupported();
         if (!supported && supportCheck.consumeFirstUnsupportedWarning()) {

@@ -6,7 +6,9 @@ which were estimated, the data sources and the estimated fruit/vegetable
 share.
 
 Requires signing in to cook.md with a Basic or Pro plan (nutrition data comes
-from the cook.md nutrition service). Without it, no badge is shown.
+from the cook.md nutrition service). Without it, a greyed "locked" badge is
+shown instead, with a hover card pointing at the plans that unlock it. Turn
+this off with the `nutriscore.showWhenLocked` setting.
 
 The score is an estimate from the recipe's ingredients using the 2023
 Nutri-Score algorithm for general foods. It is not a certified label.
