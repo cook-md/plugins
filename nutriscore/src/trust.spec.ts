@@ -48,7 +48,7 @@ describe('summarizeTrust', () => {
         const summary = summarizeTrust(aggregate(
             [item('flour', 500, 'confirmed'), item('milk', 300, 'partial', 'off'), item('vanilla', 200, 'estimated')],
         ));
-        assert.deepStrictEqual(summary.estimated, [{ name: 'vanilla', confidence: 'estimated' }]);
+        assert.deepStrictEqual(summary.estimated, ['vanilla']);
         assert.strictEqual(summary.partial, 1);
     });
 
@@ -139,10 +139,85 @@ describe('tooltipMarkdown', () => {
         const summary = summarizeTrust(aggregate([item('a', 0, 'confirmed')]));
         assert.ok(tooltipMarkdown(undefined, summary, undefined).includes("Ingredient weights are missing, so the score can't be computed per 100 g."));
     });
+
+    it('renders a multi-point score with plural "points" and, when proteinCounted is false, the protein-not-counted line', () => {
+        const summary = summarizeTrust(aggregate([item('a', 100, 'confirmed')]));
+        const text = tooltipMarkdown({ grade: 'D', score: 12, negative: 12, positive: 0, proteinCounted: false }, summary, undefined);
+        assert.ok(text.startsWith('**Nutri-Score D** · 12 points (negative 12, positive 0)'));
+        assert.ok(text.includes('Protein not counted (Nutri-Score rule for 11+ negative points).'));
+    });
+
+    it('caps a list at 8 entries with a remainder note', () => {
+        const names = Array.from({ length: 12 }, (_, index) => `ingredient${index + 1}`);
+        const summary = summarizeTrust(aggregate([item('flour', 100, 'confirmed')], names));
+        const text = tooltipMarkdown(undefined, summary, undefined);
+        assert.ok(text.includes(`Not matched: ${names.slice(0, 8).join(', ')}, and 4 more`));
+        assert.ok(!text.includes('ingredient9'));
+    });
+
+    it('truncates an individual name to 60 characters, appending an ellipsis, before escaping', () => {
+        const longName = 'x'.repeat(70);
+        const summary = summarizeTrust(aggregate([item('flour', 100, 'confirmed')], [longName]));
+        const text = tooltipMarkdown(undefined, summary, undefined);
+        assert.ok(text.includes(`Not matched: ${'x'.repeat(60)}…`));
+        assert.ok(!text.includes('x'.repeat(70)));
+    });
 });
 
 describe('escapeMarkdown', () => {
-    it('escapes markdown and HTML specials in ingredient names', () => {
-        assert.strictEqual(escapeMarkdown('[x](command:y) *b* <i>'), '\\[x\\]\\(command:y\\) \\*b\\* \\<i\\>');
+    it('escapes markdown and HTML specials in ingredient names, including colons', () => {
+        assert.strictEqual(escapeMarkdown('[x](command:y) *b* <i>'), '\\[x\\]\\(command\\:y\\) \\*b\\* \\<i\\>');
     });
+
+    it('escapes a bare URL so VS Code\'s markdown renderer cannot autolink it', () => {
+        const result = escapeMarkdown('https://evil.example/x');
+        assert.ok(result.includes('https\\:'));
+        // More robust than checking for a literal "https:" substring: assert the escaped text does not
+        // contain anything marked's GFM autolink extension would recognise as a bare URL.
+        assert.ok(!/((?:ftp|https?):\/\/|www\.)/i.test(result));
+    });
+
+    it('escapes ftp:// and www. forms too', () => {
+        assert.ok(!/((?:ftp|https?):\/\/|www\.)/i.test(escapeMarkdown('ftp://evil.example/x')));
+        assert.ok(!/((?:ftp|https?):\/\/|www\.)/i.test(escapeMarkdown('www.evil.example')));
+    });
+
+    it('collapses whitespace runs containing a newline to a single space, so a name cannot start a new markdown block', () => {
+        const result = escapeMarkdown('evil\n\n# Heading');
+        assert.ok(!result.includes('\n'));
+        assert.strictEqual(result, 'evil \\# Heading');
+    });
+
+    it('collapses CRLF and interior newline runs the same way', () => {
+        assert.strictEqual(escapeMarkdown('a\r\n\r\nb'), 'a b');
+        assert.strictEqual(escapeMarkdown('a\n \n b'), 'a b');
+    });
+
+    const cases: Array<[string, string]> = [
+        ['\\', '\\\\'],
+        ['`', '\\`'],
+        ['*', '\\*'],
+        ['_', '\\_'],
+        ['{', '\\{'],
+        ['}', '\\}'],
+        ['[', '\\['],
+        [']', '\\]'],
+        ['(', '\\('],
+        [')', '\\)'],
+        ['#', '\\#'],
+        ['+', '\\+'],
+        ['-', '\\-'],
+        ['.', '\\.'],
+        ['!', '\\!'],
+        ['|', '\\|'],
+        ['<', '\\<'],
+        ['>', '\\>'],
+        ['~', '\\~'],
+        [':', '\\:'],
+    ];
+    for (const [input, expected] of cases) {
+        it(`escapes ${JSON.stringify(input)} as ${JSON.stringify(expected)}`, () => {
+            assert.strictEqual(escapeMarkdown(input), expected);
+        });
+    }
 });

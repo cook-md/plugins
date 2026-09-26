@@ -8,8 +8,8 @@ export interface TrustSummary {
     matched: number;
     total: number;
     unmatched: string[];
-    /** Only items with confidence `estimated` -- `partial` items are counted separately, see `partial`. */
-    estimated: Array<{ name: string; confidence: string }>;
+    /** Names of items with confidence `estimated` -- `partial` items are counted separately, see `partial`. */
+    estimated: string[];
     /** Count of items with confidence `partial`. The live service marks most matches 'partial' just
      * because no preparation was given, so listing every ingredient by name would be noise. */
     partial: number;
@@ -46,6 +46,23 @@ function sourceKey(source: string): string {
     return typeof source === 'string' && source.length > 0 ? source : 'unknown';
 }
 
+const MAX_LIST_ENTRIES = 8;
+const MAX_NAME_LENGTH = 60;
+
+/** Caps a display name at `MAX_NAME_LENGTH` characters, appending an ellipsis, before it is escaped. */
+function truncateName(name: string): string {
+    return name.length > MAX_NAME_LENGTH ? `${name.slice(0, MAX_NAME_LENGTH)}…` : name;
+}
+
+/** Joins already-escaped entries, capping the visible list at `MAX_LIST_ENTRIES` with a "and N more" tail. */
+function formatList(entries: string[]): string {
+    if (entries.length <= MAX_LIST_ENTRIES) {
+        return entries.join(', ');
+    }
+    const shown = entries.slice(0, MAX_LIST_ENTRIES);
+    return `${shown.join(', ')}, and ${entries.length - MAX_LIST_ENTRIES} more`;
+}
+
 export function summarizeTrust(aggregate: NutritionAggregate): TrustSummary {
     const items = aggregate.items;
     const mass = items.reduce((sum, item) => sum + item.amount.mass_g, 0);
@@ -68,7 +85,7 @@ export function summarizeTrust(aggregate: NutritionAggregate): TrustSummary {
         matched,
         total,
         unmatched: aggregate.failures.map(failure => failure.ingredient),
-        estimated: items.filter(item => item.confidence === 'estimated').map(item => ({ name: item.ingredient, confidence: item.confidence })),
+        estimated: items.filter(item => item.confidence === 'estimated').map(item => item.ingredient),
         partial: items.filter(item => item.confidence === 'partial').length,
         sources: [...sources].map(([source, count]) => ({ source, count })),
         reliable: total > 0 && matched / total >= MIN_MATCHED_SHARE,
@@ -76,8 +93,15 @@ export function summarizeTrust(aggregate: NutritionAggregate): TrustSummary {
     };
 }
 
+/**
+ * Escapes markdown/HTML specials so untrusted ingredient names can't break out of the hover text.
+ * Collapses any whitespace run containing a newline to a single space first, so a name can't start a
+ * new markdown block (e.g. a heading); escapes `:` too, so `https://…`/`ftp://…` substrings can't be
+ * autolinked by VS Code's renderer (marked linkifies bare URLs even inside otherwise-escaped text).
+ */
 export function escapeMarkdown(text: string): string {
-    return text.replace(/[\\`*_{}[\]()#+\-.!|<>~]/g, character => `\\${character}`);
+    const collapsed = text.replace(/\s*[\r\n]+\s*/g, ' ');
+    return collapsed.replace(/[\\`*_{}[\]()#+\-.!|<>~:]/g, character => `\\${character}`);
 }
 
 /** `score` undefined means no grade (unreliable or not weighed). `fvlPercent` undefined means unknown. */
@@ -95,16 +119,17 @@ export function tooltipMarkdown(score: NutriScoreResult | undefined, summary: Tr
     lines.push(`Confidence: **${summary.level}**`);
     lines.push(`Matched: ${summary.matched} of ${summary.total} ingredients`);
     if (summary.unmatched.length > 0) {
-        lines.push(`Not matched: ${summary.unmatched.map(escapeMarkdown).join(', ')}`);
+        lines.push(`Not matched: ${formatList(summary.unmatched.map(name => escapeMarkdown(truncateName(name))))}`);
     }
     if (summary.estimated.length > 0) {
-        lines.push(`Estimated: ${summary.estimated.map(e => escapeMarkdown(e.name)).join(', ')}`);
+        lines.push(`Estimated: ${formatList(summary.estimated.map(name => escapeMarkdown(truncateName(name))))}`);
     }
     if (summary.partial > 0) {
         lines.push(`Partial matches: ${summary.partial} (e.g. preparation not specified)`);
     }
     if (summary.sources.length > 0) {
-        lines.push(`Sources: ${summary.sources.map(s => `${escapeMarkdown(formatSource(s.source))} (${s.count})`).join(', ')}`);
+        const entries = summary.sources.map(s => `${escapeMarkdown(truncateName(formatSource(s.source)))} (${s.count})`);
+        lines.push(`Sources: ${formatList(entries)}`);
     }
     lines.push(fvlPercent === undefined
         ? 'Fruit/veg/legumes: unknown (counted as 0 %)'
