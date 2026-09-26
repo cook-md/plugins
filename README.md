@@ -10,6 +10,7 @@ writing your own. Each plugin is a standalone npm package in its own folder.
 | [`pantry`](./pantry) | See and edit `config/pantry.conf`: stock levels, low and out-of-stock items, expiry. Install it from the Extensions view. Shows editing a config file through the Cooklang API. |
 | [`recipe-hub`](./recipe-hub) | Search recipes.cooklang.org, preview results and save them to Drafts. Install it from the Extensions view. Shows a read-only file system provider and `cooklang.api.saveDraft`. |
 | [`nutriscore`](./nutriscore) | Nutri-Score badge on recipe previews, with a hover card showing how reliable it is. Needs a Cook Basic or Pro plan. Install it from the Extensions view. Shows the preview badge outlet and rendering a report template with `cooklang.api.renderReport`. |
+| [`allergens`](./allergens) | Flags the allergens you choose on recipe previews: the 14 regulated allergens (Cook Basic or Pro) and your own words (free). Install it from the Extensions view. Shows a `pill` preview badge and `cooklang.api.refreshBadges`. |
 
 ## How plugins work
 

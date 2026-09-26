@@ -1,0 +1,72 @@
+{
+  "name": "allergens",
+  "displayName": "Allergens",
+  "description": "Flags the allergens you choose on recipe previews. Custom words work for everyone; the 14 regulated allergens use the cook.md nutrition service (Cook Basic or Pro).",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/cook-md/plugins.git", "directory": "allergens" },
+  "keywords": ["cooklang", "allergens", "nutrition", "recipes"],
+  "engines": { "vscode": "^1.100.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "cooklang.allergens.provideBadge", "title": "Allergens", "category": "Allergens" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "cooklang.allergens.provideBadge", "when": "false" }
+      ],
+      "cooklang/recipePreview/badge": [
+        { "command": "cooklang.allergens.provideBadge" }
+      ]
+    },
+    "configuration": {
+      "title": "Allergens",
+      "properties": {
+        "allergens.gluten": { "type": "boolean", "default": false, "order": 1, "description": "Flag gluten (wheat, rye, barley, oats). Needs Cook Basic or Pro." },
+        "allergens.crustaceans": { "type": "boolean", "default": false, "order": 2, "description": "Flag crustaceans. Needs Cook Basic or Pro." },
+        "allergens.eggs": { "type": "boolean", "default": false, "order": 3, "description": "Flag eggs. Needs Cook Basic or Pro." },
+        "allergens.fish": { "type": "boolean", "default": false, "order": 4, "description": "Flag fish. Needs Cook Basic or Pro." },
+        "allergens.peanuts": { "type": "boolean", "default": false, "order": 5, "description": "Flag peanuts. Needs Cook Basic or Pro." },
+        "allergens.soybeans": { "type": "boolean", "default": false, "order": 6, "description": "Flag soy. Needs Cook Basic or Pro." },
+        "allergens.milk": { "type": "boolean", "default": false, "order": 7, "description": "Flag milk. Needs Cook Basic or Pro." },
+        "allergens.treeNuts": { "type": "boolean", "default": false, "order": 8, "description": "Flag tree nuts (almonds, hazelnuts, walnuts…). Needs Cook Basic or Pro." },
+        "allergens.celery": { "type": "boolean", "default": false, "order": 9, "description": "Flag celery. Needs Cook Basic or Pro." },
+        "allergens.mustard": { "type": "boolean", "default": false, "order": 10, "description": "Flag mustard. Needs Cook Basic or Pro." },
+        "allergens.sesame": { "type": "boolean", "default": false, "order": 11, "description": "Flag sesame. Needs Cook Basic or Pro." },
+        "allergens.sulphites": { "type": "boolean", "default": false, "order": 12, "description": "Flag sulphites. Needs Cook Basic or Pro." },
+        "allergens.lupin": { "type": "boolean", "default": false, "order": 13, "description": "Flag lupin. Needs Cook Basic or Pro." },
+        "allergens.molluscs": { "type": "boolean", "default": false, "order": 14, "description": "Flag molluscs. Needs Cook Basic or Pro." },
+        "allergens.custom": {
+          "type": "array", "items": { "type": "string" }, "default": [], "order": 15,
+          "description": "Other words to flag, matched against ingredient names (e.g. coriander). Plurals match both ways. Free for everyone."
+        },
+        "allergens.showWhenLocked": {
+          "type": "boolean", "default": true, "order": 16,
+          "description": "When your plan doesn't include nutrition data, show a hint that the standard allergens can't be checked."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath allergens-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^18.19.0",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^3.3.0",
+    "mocha": "^10.4.0",
+    "ovsx": "^1.0.0",
+    "typescript": "~5.4.5"
+  }
+}
