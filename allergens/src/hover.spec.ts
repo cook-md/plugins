@@ -37,7 +37,7 @@ describe('hoverMarkdown', () => {
     it('puts the standard-unchecked line right after the title', () => {
         const markdown = hoverMarkdown({ pillLabels: [], lines: [], unknown: ['saffron'], standardUnchecked: true }, false);
         assert.strictEqual(markdown.split('\n\n')[1], UNCHECKED_LINE);
-        assert.strictEqual(UNCHECKED_LINE, "Couldn't reach the cook.md nutrition service, so the standard allergens weren't checked.");
+        assert.strictEqual(UNCHECKED_LINE, "The standard allergens couldn't be checked: the cook.md nutrition service was unreachable or returned an error.");
     });
 
     it('truncates names on code points, not UTF-16 units', () => {

@@ -61,7 +61,9 @@ export class AllergenBadgeProvider {
             output = this.parse(result, false);
         }
         if (!output) {
-            return undefined;
+            // The names-only render failed too: keep what is known about the standard classes
+            // (unchecked or locked) rather than dropping the badge.
+            return wantsStandard ? badgeFor({ ...NO_FINDINGS, standardUnchecked }, locked, settings.showWhenLocked) : undefined;
         }
         if (!failed) {
             this.logged.clear();

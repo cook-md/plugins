@@ -144,12 +144,19 @@ describe('AllergenBadgeProvider', () => {
         assert.deepStrictEqual(s.logs, ['Allergens unavailable (output): unexpected template output']);
     });
 
-    it('shows nothing when the names-only render fails, logging each reason once', async () => {
+    it('still warns that the standard allergens were unchecked when the names-only render fails too, logging once', async () => {
         const failure: PluginReportResult = { ok: false, reason: 'network', message: 'offline' };
         const s = setup({ values: { milk: true, custom: ['coriander'] }, results: [failure, failure, failure, failure] });
-        assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
-        assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
+        const badge = await s.provider.provide(CONTEXT);
+        assert.deepStrictEqual([badge?.tone, badge?.text], ['warning', '⚠ Check allergens']);
+        assert.ok(badge?.tooltipMarkdown.includes(UNCHECKED_LINE));
+        assert.strictEqual((await s.provider.provide(CONTEXT))?.text, '⚠ Check allergens');
         assert.deepStrictEqual(s.logs, ['Allergens unavailable (network): offline']);
+    });
+
+    it('keeps the locked pill when the plan lacks nutrition and the names-only render fails', async () => {
+        const s = setup({ values: { milk: true, custom: ['coriander'] }, feature: false, results: [{ ok: false, reason: 'template', message: 'x' }] });
+        assert.deepStrictEqual(await s.provider.provide(CONTEXT), { kind: 'pill', text: '🔒 Allergens', tone: 'neutral', tooltipMarkdown: LOCKED_TOOLTIP });
     });
 
     it('shows nothing for malformed names-only output', async () => {

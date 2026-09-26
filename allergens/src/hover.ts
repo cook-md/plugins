@@ -14,7 +14,7 @@ export interface AllergenFindings {
 
 const MAX_LINES = 8;
 export const DISCLAIMER = '_Informational only — always check product labels._';
-export const UNCHECKED_LINE = "Couldn't reach the cook.md nutrition service, so the standard allergens weren't checked.";
+export const UNCHECKED_LINE = "The standard allergens couldn't be checked: the cook.md nutrition service was unreachable or returned an error.";
 export const LOCKED_LINE = 'Checking the standard allergens needs a Cook Basic or Pro plan. [See plans](https://cook.md/pricing)';
 
 /** Tooltip of the neutral "🔒 Allergens" pill. */

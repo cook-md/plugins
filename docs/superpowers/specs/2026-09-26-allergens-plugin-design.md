@@ -94,7 +94,7 @@ Informational only — always check product labels.
 
 Locked variant (standard ticked, not subscribed): a line "Checking the standard allergens needs a Cook Basic or Pro plan. [See plans](https://cook.md/pricing)".
 
-Service unreachable: a line "Couldn't reach the cook.md nutrition service, so the standard allergens weren't checked."
+Service unreachable: a line "The standard allergens couldn't be checked: the cook.md nutrition service was unreachable or returned an error." This also applies when the names-only fallback render fails: the badge keeps the unchecked (amber) or locked state instead of disappearing.
 
 Block order: title, service-unreachable line, `Couldn't check: …`, hit list, locked line, disclaimer. The editor cuts `tooltipMarkdown` at 4000 characters, so the hover is kept ≤ 3900: hit lines are dropped from the end (replaced by `- and N more`) until it fits — what wasn't checked and the disclaimer always survive.
 
