@@ -1,7 +1,7 @@
 {
   "name": "pantry",
   "displayName": "Pantry",
-  "description": "See and edit what's in your pantry (config/pantry.conf): stock levels, low and out-of-stock items, expiry dates. Ships with Cook Editor.",
+  "description": "See and edit what's in your pantry (config/pantry.conf): stock levels, low and out-of-stock items, expiry dates.",
   "version": "0.1.0",
   "publisher": "cooklang",
   "license": "MIT",
