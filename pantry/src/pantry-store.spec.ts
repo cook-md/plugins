@@ -144,6 +144,34 @@ describe('PantryStore', () => {
         assert.strictEqual(store.getState().kind, 'noFile');
     });
 
+    it('does not notify again when a reload finds the text it just wrote', async () => {
+        const { store, files } = makeStore();
+        files.text = 'fridge/milk\n';
+        await store.load();
+        let changes = 0;
+        store.onDidChange(() => changes++);
+        await store.edit({ op: 'add', section: 'fridge', name: 'eggs' });
+        assert.strictEqual(changes, 1, 'the edit notifies');
+        // The file watcher fires for our own write: same text, nothing to re-render.
+        await store.load();
+        assert.strictEqual(changes, 1, 'the watcher reload is a no-op');
+        files.text = 'fridge/milk\nfreezer/peas\n';
+        await store.load();
+        assert.strictEqual(changes, 2, 'an external change still notifies');
+    });
+
+    it('still notifies when only the edit error changes', async () => {
+        const { store, files } = makeStore();
+        files.text = 'fridge/milk\n';
+        await store.load();
+        let changes = 0;
+        store.onDidChange(() => changes++);
+        await store.edit({ op: 'remove', section: 'fridge', name: 'eggs' });
+        assert.strictEqual(changes, 1, 'the failed edit notifies with its error');
+        await store.edit({ op: 'update', section: 'fridge', name: 'milk', fields: {} });
+        assert.strictEqual(changes, 2, 'the error clearing notifies');
+    });
+
     it('notifies listeners and debounces scheduled reloads', async () => {
         const { store, files } = makeStore();
         let changes = 0;

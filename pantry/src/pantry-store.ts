@@ -40,6 +40,9 @@ export class PantryStore {
 
     protected state: PantryState = { kind: 'loading' };
     protected editError: string | undefined;
+    /** File text and what listeners were last told, so a reload of unchanged text (our own write) stays quiet. */
+    protected lastText: string | undefined;
+    protected lastEmitted: string | undefined;
     protected queue: Promise<void> = Promise.resolve();
     protected reloadTimer: ReturnType<typeof setTimeout> | undefined;
     protected disposed = false;
@@ -132,8 +135,16 @@ export class PantryStore {
         try {
             text = await this.files.read();
         } catch (e) {
+            this.lastText = undefined;
             this.state = { kind: 'parseError', message: `Could not read ${PANTRY_FILE}: ${messageOf(e)}` };
-            this.emit();
+            this.emitIfChanged();
+            return;
+        }
+        const unchanged = text !== undefined && text === this.lastText && this.state.kind !== 'loading';
+        this.lastText = text;
+        if (unchanged) {
+            // Same text parses to the same state; only a changed edit error needs telling.
+            this.emitIfChanged();
             return;
         }
         if (text === undefined) {
@@ -145,7 +156,7 @@ export class PantryStore {
                 this.state = { kind: 'parseError', message: messageOf(e) };
             }
         }
-        this.emit();
+        this.emitIfChanged();
     }
 
     protected enqueue<T>(work: () => Promise<T>): Promise<T> {
@@ -155,10 +166,22 @@ export class PantryStore {
         return run;
     }
 
+    /** Emits unless the state and edit error are exactly what listeners last saw. */
+    protected emitIfChanged(): void {
+        if (this.snapshot() !== this.lastEmitted) {
+            this.emit();
+        }
+    }
+
+    protected snapshot(): string {
+        return JSON.stringify({ state: this.state, editError: this.editError });
+    }
+
     protected emit(): void {
         if (this.disposed) {
             return;
         }
+        this.lastEmitted = this.snapshot();
         this.listeners.forEach(listener => {
             try {
                 listener();
