@@ -89,11 +89,19 @@ describe('view-model', () => {
             { quantity: '1 L', low: '200 ml', bought: 'last week', expire: '2026-10-01' });
     });
 
-    it('sends only changed fields, with an empty string for a cleared one', () => {
-        const milk = item({ name: 'milk', quantity: '1%L', expire: '01.10.2026', expireDate: '2026-10-01' });
-        assert.deepStrictEqual(changedFields(milk, { quantity: '1 L', low: '', bought: '', expire: '2026-10-01' }), {});
-        assert.deepStrictEqual(changedFields(milk, { quantity: '2 L', low: '500 ml', bought: '', expire: '' }),
+    it('sends only fields changed from the form baseline, with an empty string for a cleared one', () => {
+        const base = initialDraft(item({ name: 'milk', quantity: '1%L', expire: '01.10.2026', expireDate: '2026-10-01' }));
+        assert.deepStrictEqual(changedFields(base, { quantity: '1 L', low: '', bought: '', expire: '2026-10-01' }), {});
+        assert.deepStrictEqual(changedFields(base, { quantity: '2 L', low: '500 ml', bought: '', expire: '' }),
             { quantity: '2%L', low: '500%ml', expire: '' });
+    });
+
+    it('does not send an untouched field that changed outside the form', () => {
+        const opened = item({ name: 'milk', quantity: '1%L', low: '200%ml' });
+        const base = initialDraft(opened);
+        const draft = { ...base, quantity: '2 L' };
+        // Meanwhile someone else set low to 300 ml in pantry.conf; the draft still holds the old 200 ml.
+        assert.deepStrictEqual(changedFields(base, draft), { quantity: '2%L' });
     });
 
     it('builds add attributes from non-empty fields only', () => {

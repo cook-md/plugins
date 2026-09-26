@@ -115,20 +115,22 @@ export function initialDraft(item: PantryItem): EditDraft {
     };
 }
 
-/** Fields that differ from the item; a field emptied by the user is sent as `''` (clears it). */
-export function changedFields(item: PantryItem, draft: EditDraft): PantryAttributes {
-    const initial = initialDraft(item);
+/**
+ * Fields the user changed since the form opened (`base`); a field emptied by the user is sent as `''` (clears it).
+ * Diffing against the baseline, not the current item, keeps untouched fields from overwriting external changes.
+ */
+export function changedFields(base: EditDraft, draft: EditDraft): PantryAttributes {
     const fields: PantryAttributes = {};
-    if (draft.quantity.trim() !== initial.quantity) {
+    if (draft.quantity.trim() !== base.quantity) {
         fields.quantity = storedQuantity(draft.quantity);
     }
-    if (draft.low.trim() !== initial.low) {
+    if (draft.low.trim() !== base.low) {
         fields.low = storedQuantity(draft.low);
     }
-    if (draft.bought.trim() !== initial.bought) {
+    if (draft.bought.trim() !== base.bought) {
         fields.bought = draft.bought.trim();
     }
-    if (draft.expire.trim() !== initial.expire) {
+    if (draft.expire.trim() !== base.expire) {
         fields.expire = draft.expire.trim();
     }
     return fields;

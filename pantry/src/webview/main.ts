@@ -20,7 +20,8 @@ let state: ViewState | undefined;
 let search = '';
 let filter: PantryFilter = 'all';
 const collapsed = new Set<string>();
-let editing: { section: string; name: string; draft: EditDraft } | undefined;
+/** `base` is the draft as the form opened; saving sends only what differs from it. */
+let editing: { section: string; name: string; base: EditDraft; draft: EditDraft } | undefined;
 let adding: ({ section: string; name: string } & EditDraft) | undefined;
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
@@ -235,7 +236,8 @@ function itemRow(section: string, item: PantryItem, today: string): HTMLElement 
     const status = itemStatus(item, today);
     const row = element('div', 'item');
     const head = button('item-head', '', () => {
-        editing = isEditing(section, item) ? undefined : { section, name: item.name, draft: initialDraft(item) };
+        const base = initialDraft(item);
+        editing = isEditing(section, item) ? undefined : { section, name: item.name, base, draft: { ...base } };
         renderList();
     });
     const dot = element('span', `dot ${status}`);
@@ -249,7 +251,7 @@ function itemRow(section: string, item: PantryItem, today: string): HTMLElement 
     }
     row.append(head);
     if (editing && isEditing(section, item)) {
-        row.append(editForm(section, item, editing.draft));
+        row.append(editForm(section, item, editing.base, editing.draft));
     }
     return row;
 }
@@ -258,7 +260,7 @@ function isEditing(section: string, item: PantryItem): boolean {
     return editing?.section === section && editing.name === item.name;
 }
 
-function editForm(section: string, item: PantryItem, draft: EditDraft): HTMLElement {
+function editForm(section: string, item: PantryItem, base: EditDraft, draft: EditDraft): HTMLElement {
     const form = element('div', 'form');
     const grid = element('div', 'grid');
     grid.append(
@@ -269,7 +271,7 @@ function editForm(section: string, item: PantryItem, draft: EditDraft): HTMLElem
     );
     const close = (): void => { editing = undefined; renderList(); };
     const save = (): void => {
-        const fields = changedFields(item, draft);
+        const fields = changedFields(base, draft);
         if (Object.keys(fields).length > 0) {
             vscode.postMessage({ type: 'update', section, name: item.name, fields });
         }
