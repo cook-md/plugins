@@ -59,6 +59,15 @@ describe('pillText', () => {
         }
         assert.strictEqual(pillText(['x'.repeat(40), 'Milk']), `⚠ ${'x'.repeat(18)}… +1`);
     });
+
+    it('never cuts a label in the middle of a surrogate pair', () => {
+        const loneSurrogate = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/;
+        for (const labels of [['x' + '🥜'.repeat(12), 'Milk'], ['🥜'.repeat(12)], ['xx' + '🥜'.repeat(12), 'Milk']]) {
+            const text = pillText(labels);
+            assert.ok(text.length <= 24, text);
+            assert.ok(!loneSurrogate.test(text), JSON.stringify(text));
+        }
+    });
 });
 
 describe('badgeFor', () => {

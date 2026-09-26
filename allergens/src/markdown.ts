@@ -1,9 +1,10 @@
 const MAX_LIST_ENTRIES = 8;
 const MAX_NAME_LENGTH = 60;
 
-/** Caps a display name at 60 characters, appending an ellipsis, before it is escaped. */
+/** Caps a display name at 60 code points (never splitting a surrogate pair), appending an ellipsis, before it is escaped. */
 export function truncateName(name: string): string {
-    return name.length > MAX_NAME_LENGTH ? `${name.slice(0, MAX_NAME_LENGTH)}…` : name;
+    const characters = Array.from(name);
+    return characters.length > MAX_NAME_LENGTH ? `${characters.slice(0, MAX_NAME_LENGTH).join('')}…` : name;
 }
 
 /**

@@ -69,7 +69,15 @@ export function pillText(labels: readonly string[]): string {
     }
     const suffix = labels.length > 1 ? ` +${labels.length - 1}` : '';
     const room = MAX_PILL_TEXT - '⚠ '.length - '…'.length - suffix.length;
-    return `⚠ ${labels[0].slice(0, room)}…${suffix}`;
+    // Cut on code points so an emoji is never split into a lone surrogate.
+    let cut = '';
+    for (const character of labels[0]) {
+        if (cut.length + character.length > room) {
+            break;
+        }
+        cut += character;
+    }
+    return `⚠ ${cut}…${suffix}`;
 }
 
 /**

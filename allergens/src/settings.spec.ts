@@ -14,6 +14,11 @@ describe('readSettings', () => {
         assert.deepStrictEqual(settings.customWords, ['Coriander', 'Mushroom']);
     });
 
+    it('turns control characters and whitespace runs inside custom words into one space', () => {
+        const settings = readSettings(reader({ custom: ['soy\tsauce', 'a\u0000b', 'x\u0085\n y', '\u0007'] }));
+        assert.deepStrictEqual(settings.customWords, ['soy sauce', 'a b', 'x y']);
+    });
+
     it('treats a non-array custom setting as empty', () => {
         assert.deepStrictEqual(readSettings(reader({ custom: 'coriander' })).customWords, []);
     });

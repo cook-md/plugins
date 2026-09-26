@@ -40,6 +40,32 @@ describe('hoverMarkdown', () => {
         assert.strictEqual(UNCHECKED_LINE, "Couldn't reach the cook.md nutrition service, so the standard allergens weren't checked.");
     });
 
+    it('truncates names on code points, not UTF-16 units', () => {
+        const markdown = hoverMarkdown({ pillLabels: [], lines: [], unknown: ['x' + '🥜'.repeat(70)], standardUnchecked: false }, false);
+        assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/.test(markdown));
+        assert.ok(markdown.includes(`x${'🥜'.repeat(59)}…`));
+    });
+
+    it('stays within 3900 characters by dropping hit lines, never what was unchecked or the disclaimer', () => {
+        const long = (i: number): string => `${'*'.repeat(58)}${String(i).padStart(2, '0')}`;
+        const names = Array.from({ length: 12 }, (_, i) => long(i));
+        const markdown = hoverMarkdown({
+            pillLabels: ['x'],
+            lines: Array.from({ length: 10 }, (_, i) => ({ label: long(i), ingredients: names })),
+            unknown: names,
+            standardUnchecked: true,
+        }, true);
+        assert.ok(markdown.length <= 3900, String(markdown.length));
+        assert.ok(markdown.includes(UNCHECKED_LINE));
+        assert.ok(markdown.includes("Couldn't check: "));
+        assert.ok(markdown.includes('Checking the standard allergens needs a Cook Basic or Pro plan.'));
+        assert.ok(markdown.endsWith('_Informational only — always check product labels._'));
+        const more = /- and (\d+) more/.exec(markdown);
+        const shown = (markdown.match(/^- \*\*/gm) ?? []).length;
+        assert.ok(more && shown >= 1, markdown);
+        assert.strictEqual(shown + Number(more[1]), 10);
+    });
+
     it('adds the locked line when asked', () => {
         assert.ok(hoverMarkdown({ pillLabels: [], lines: [], unknown: [], standardUnchecked: false }, true)
             .includes('Checking the standard allergens needs a Cook Basic or Pro plan. [See plans](https://cook.md/pricing)'));

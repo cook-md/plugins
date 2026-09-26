@@ -24,31 +24,41 @@ Sign in to cook.md with a Cook Basic or Pro plan to check recipes for the allerg
 
 [See plans](https://cook.md/pricing)`;
 
+/** The editor truncates `tooltipMarkdown` at 4000 characters; stay clear of it. */
+export const MAX_HOVER_LENGTH = 3900;
+
 /**
- * Title, what wasn't checked (never dropped), the hits, the locked line and the disclaimer.
+ * Title, what wasn't checked, the hits, the locked line and the disclaimer. What wasn't
+ * checked and the disclaimer always survive: to fit `MAX_HOVER_LENGTH`, hit lines are
+ * dropped from the end and counted in an "and N more" line.
  * `locked`: add the "needs a Cook Basic or Pro plan" line.
  */
 export function hoverMarkdown(findings: AllergenFindings, locked: boolean): string {
-    const blocks = ['**Allergens**'];
+    const before = ['**Allergens**'];
     if (findings.standardUnchecked) {
-        blocks.push(UNCHECKED_LINE);
+        before.push(UNCHECKED_LINE);
     }
     if (findings.unknown.length > 0) {
-        blocks.push(`Couldn't check: ${formatNames(findings.unknown)}`);
+        before.push(`Couldn't check: ${formatNames(findings.unknown)}`);
     }
-    if (findings.lines.length > 0) {
-        const shown = findings.lines.slice(0, MAX_LINES)
-            .map(line => `- **${escapeMarkdown(truncateName(line.label))}** — ${formatNames(line.ingredients)}`);
-        if (findings.lines.length > MAX_LINES) {
-            shown.push(`- and ${findings.lines.length - MAX_LINES} more`);
+    const after = locked ? [LOCKED_LINE, DISCLAIMER] : [DISCLAIMER];
+    if (findings.lines.length === 0) {
+        const none = findings.unknown.length > 0 ? ['None of your allergens were found in the ingredients that could be checked.'] : [];
+        return [...before, ...none, ...after].join('\n\n');
+    }
+    const hitLines = findings.lines.map(line => `- **${escapeMarkdown(truncateName(line.label))}** — ${formatNames(line.ingredients)}`);
+    const withHits = (shown: number): string => {
+        const list = hitLines.slice(0, shown);
+        if (shown < hitLines.length) {
+            list.push(`- and ${hitLines.length - shown} more`);
         }
-        blocks.push(shown.join('\n'));
-    } else if (findings.unknown.length > 0) {
-        blocks.push('None of your allergens were found in the ingredients that could be checked.');
+        return [...before, list.join('\n'), ...after].join('\n\n');
+    };
+    let shown = Math.min(hitLines.length, MAX_LINES);
+    let markdown = withHits(shown);
+    while (markdown.length > MAX_HOVER_LENGTH && shown > 0) {
+        shown--;
+        markdown = withHits(shown);
     }
-    if (locked) {
-        blocks.push(LOCKED_LINE);
-    }
-    blocks.push(DISCLAIMER);
-    return blocks.join('\n\n');
+    return markdown;
 }

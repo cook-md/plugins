@@ -5,7 +5,7 @@ export const MAX_CUSTOM_WORD_LENGTH = 40;
 export interface AllergenSettings {
     /** Ticked EU-14 classes, in table order. */
     classes: readonly AllergenClass[];
-    /** Custom words as the user typed them (trimmed), deduplicated case-insensitively. */
+    /** Custom words as the user typed them (whitespace/control runs → one space, trimmed), deduplicated case-insensitively. */
     customWords: readonly string[];
     showWhenLocked: boolean;
 }
@@ -22,7 +22,8 @@ export function readSettings(read: ReadSetting): AllergenSettings {
         if (typeof entry !== 'string') {
             continue;
         }
-        const word = entry.trim();
+        // Control characters (tabs, NULs, C1 controls) would break the pill; fold them into spaces.
+        const word = entry.replace(/[\u0000-\u001f\u007f-\u009f\s]+/g, ' ').trim();
         const folded = word.toLowerCase();
         if (word === '' || word.length > MAX_CUSTOM_WORD_LENGTH || seen.has(folded)) {
             continue;

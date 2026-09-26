@@ -17,6 +17,8 @@ describe('matchesWord', () => {
         ['a.b', 'axb', false],
         ['crème', 'crème fraîche', true],
         ['egg', 'eggplant', false],
+        ['crème'.normalize('NFC'), 'crème fraîche'.normalize('NFD'), true],
+        ['crème'.normalize('NFD'), 'crème fraîche'.normalize('NFC'), true],
     ];
     for (const [word, name, expected] of cases) {
         it(`${JSON.stringify(word)} ${expected ? 'matches' : 'does not match'} ${JSON.stringify(name)}`, () => {
