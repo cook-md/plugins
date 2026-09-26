@@ -92,6 +92,32 @@ describe('NutriScoreBadgeProvider', () => {
     it('ignores anything that is not a preview context', async () => {
         const { provider: p, calls } = provider({});
         assert.strictEqual(await p.provide({ uri: 3 }), undefined);
+        assert.strictEqual(await p.provide({ ...CONTEXT, version: 2 }), undefined);
         assert.strictEqual(calls.length, 0);
+    });
+
+    it('remembers that categories are unsupported and skips the retry on later calls', async () => {
+        const { provider: p, calls } = provider({ results: [
+            { ok: false, reason: 'template', message: 'category not found: legume' },
+            rendered(aggregate, []),
+            rendered(aggregate, []),
+        ] });
+        await p.provide(CONTEXT);
+        await p.provide(CONTEXT);
+        const renderCalls = calls.filter(call => call.command === 'cooklang.api.renderReport');
+        assert.strictEqual(renderCalls.length, 3);
+        assert.deepStrictEqual(renderCalls[2].arg, { uri: CONTEXT.uri, template: nutritionTemplate([]), scale: 2 });
+    });
+
+    it('logs a failure again after a badge succeeds in between', async () => {
+        const failure: PluginReportResult = { ok: false, reason: 'network', message: 'offline' };
+        const { provider: p, logs } = provider({ results: [failure, rendered(aggregate, ['apple']), failure] });
+        assert.strictEqual(await p.provide(CONTEXT), undefined);
+        assert.ok(await p.provide(CONTEXT));
+        assert.strictEqual(await p.provide(CONTEXT), undefined);
+        assert.deepStrictEqual(logs, [
+            'Nutri-Score unavailable (network): offline',
+            'Nutri-Score unavailable (network): offline',
+        ]);
     });
 });
