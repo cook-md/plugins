@@ -14,6 +14,9 @@ export class SupportCheck {
     protected supported: boolean | undefined;
     protected lastCheckedAt: number | undefined;
     protected unsupportedWarningPending = false;
+    /** Set synchronously before any `await`, so concurrent callers (several open previews
+     * polling at startup) share one API round trip instead of each starting their own. */
+    protected pending: Promise<boolean> | undefined;
 
     constructor(
         protected readonly api: CooklangApi,
@@ -21,16 +24,24 @@ export class SupportCheck {
         protected readonly recheckMs = 30000,
     ) { }
 
-    async isSupported(): Promise<boolean> {
+    isSupported(): Promise<boolean> {
         if (this.supported === true) {
-            return true;
+            return Promise.resolve(true);
         }
         const nowMs = this.now();
         if (this.supported === false && this.lastCheckedAt !== undefined && nowMs - this.lastCheckedAt < this.recheckMs) {
-            return false;
+            return Promise.resolve(false);
         }
-        const isFirstCheck = this.supported === undefined;
+        if (this.pending) {
+            return this.pending;
+        }
         this.lastCheckedAt = nowMs;
+        this.pending = this.check().finally(() => { this.pending = undefined; });
+        return this.pending;
+    }
+
+    protected async check(): Promise<boolean> {
+        const isFirstCheck = this.supported === undefined;
         try {
             this.supported = await this.api.version() === SUPPORTED_API_VERSION && await this.api.supportsReports();
         } catch {

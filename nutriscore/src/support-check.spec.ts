@@ -72,4 +72,15 @@ describe('SupportCheck', () => {
         await check.isSupported();
         assert.strictEqual(check.consumeFirstUnsupportedWarning(), false);
     });
+
+    it('shares one in-flight check between concurrent callers', async () => {
+        const { api: cooklangApi, calls } = api({ commands: [] });
+        const check = new SupportCheck(cooklangApi);
+        const [first, second] = [check.isSupported(), check.isSupported()];
+        assert.strictEqual(await first, false);
+        assert.strictEqual(await second, false);
+        assert.strictEqual(calls.length, 1);
+        assert.strictEqual(check.consumeFirstUnsupportedWarning(), true);
+        assert.strictEqual(check.consumeFirstUnsupportedWarning(), false);
+    });
 });
