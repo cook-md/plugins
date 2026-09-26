@@ -24,8 +24,10 @@ export type PantryState =
     | { kind: 'parseError'; message: string }
     | { kind: 'loaded'; sections: PantrySection[] };
 
+/** The error text for the user, without the native caller prefix (`editPantry: …`). */
 function messageOf(e: unknown): string {
-    return e instanceof Error ? e.message : String(e);
+    const message = e instanceof Error ? e.message : String(e);
+    return message.replace(/^(?:editPantry|parsePantry): (?:Error parsing input: )?/, '');
 }
 
 /**

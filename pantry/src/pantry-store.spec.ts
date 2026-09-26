@@ -58,7 +58,7 @@ describe('PantryStore', () => {
         assert.deepStrictEqual(store.getState(), { kind: 'noFile' });
         files.text = 'GARBAGE';
         await store.load();
-        assert.deepStrictEqual(store.getState(), { kind: 'parseError', message: 'parsePantry: bad TOML' });
+        assert.deepStrictEqual(store.getState(), { kind: 'parseError', message: 'bad TOML' }, 'the native caller prefix is not shown');
         files.text = 'fridge/milk\n';
         await store.load();
         assert.deepStrictEqual(store.getState(), {
@@ -99,7 +99,7 @@ describe('PantryStore', () => {
         const { store, files } = makeStore();
         files.text = 'fridge/milk\n';
         await store.edit({ op: 'remove', section: 'fridge', name: 'eggs' });
-        assert.strictEqual(store.getEditError(), "editPantry: item 'eggs' not found in section 'fridge'");
+        assert.strictEqual(store.getEditError(), "item 'eggs' not found in section 'fridge'");
         assert.strictEqual(files.writes.length, 0);
         assert.strictEqual(store.getState().kind, 'loaded');
         store.dismissEditError();

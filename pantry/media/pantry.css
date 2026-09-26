@@ -27,7 +27,7 @@ input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px
 .empty { padding: 16px 4px; color: var(--vscode-descriptionForeground); text-align: center; }
 .empty p { margin: 0 0 10px 0; }
 .error { padding: 8px 0; color: var(--vscode-errorForeground); }
-.error p { margin: 0 0 8px 0; }
+.error p { margin: 0 0 8px 0; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .banner {
     display: flex;
@@ -39,7 +39,7 @@ input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px
     border: 1px solid var(--vscode-inputValidation-errorBorder);
 }
 
-.banner span { flex: 1; }
+.banner span { flex: 1; white-space: pre-wrap; overflow-wrap: anywhere; }
 
 .primary, .secondary, .danger {
     padding: 3px 10px;
