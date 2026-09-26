@@ -1,0 +1,302 @@
+import type { PantryItem } from '../cooklang-api';
+import type { FromWebview, ToWebview, ViewState } from '../protocol';
+import {
+    EditDraft, ItemStatus, PantryFilter, addAttributes, changedFields, daysUntil, displayQuantity, expiryLabel,
+    initialDraft, itemStatus, sectionChoices, todayIso, visibleSections,
+} from '../view-model';
+
+declare function acquireVsCodeApi(): { postMessage(message: FromWebview): void };
+
+const vscode = acquireVsCodeApi();
+const root = document.getElementById('root')!;
+
+const FILTERS: Array<[PantryFilter, string]> = [['all', 'All'], ['low', 'Low'], ['out', 'Out of stock'], ['expiring', 'Expiring']];
+const STATUS_LABELS: Record<ItemStatus, string> = {
+    expired: 'Expired', out: 'Out of stock', low: 'Low stock', expiring: 'Expiring soon', ok: 'In stock',
+};
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+
+let state: ViewState | undefined;
+let search = '';
+let filter: PantryFilter = 'all';
+const collapsed = new Set<string>();
+let editing: { section: string; name: string; draft: EditDraft } | undefined;
+let adding: ({ section: string; name: string } & EditDraft) | undefined;
+
+function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
+    const node = document.createElement(tag);
+    if (className) { node.className = className; }
+    if (text !== undefined) { node.textContent = text; }
+    return node;
+}
+
+function button(className: string, text: string, onClick: () => void): HTMLButtonElement {
+    const node = element('button', className, text);
+    node.type = 'button';
+    node.addEventListener('click', onClick);
+    return node;
+}
+
+/** A labelled input; date fields fall back to text when the stored value is not ISO. */
+function field(label: string, value: string, kind: 'text' | 'date', onInput: (value: string) => void, placeholder = ''): HTMLLabelElement {
+    const wrapper = element('label', 'field');
+    wrapper.append(element('span', 'field-label', label));
+    const input = element('input');
+    input.type = kind === 'date' && (value === '' || ISO_DATE.test(value)) ? 'date' : 'text';
+    input.value = value;
+    input.placeholder = placeholder;
+    input.addEventListener('input', () => onInput(input.value));
+    wrapper.append(input);
+    return wrapper;
+}
+
+/** Enter submits and Escape cancels, for every input inside `form`. */
+function keys(form: HTMLElement, submit: () => void, cancel: () => void): void {
+    form.addEventListener('keydown', event => {
+        if (event.key === 'Enter') { event.preventDefault(); submit(); }
+        if (event.key === 'Escape') { event.preventDefault(); cancel(); }
+    });
+}
+
+// --- persistent parts (kept across renders so the search box keeps focus) ---
+
+const banner = element('div');
+const body = element('div');
+const toolbar = element('div', 'toolbar');
+const addContainer = element('div');
+const list = element('div', 'sections');
+const chips = new Map<PantryFilter, HTMLButtonElement>();
+
+const searchInput = element('input', 'search');
+searchInput.type = 'search';
+searchInput.placeholder = 'Search pantry';
+searchInput.addEventListener('input', () => { search = searchInput.value; renderList(); });
+const chipRow = element('div', 'chips');
+for (const [value, label] of FILTERS) {
+    const chip = button('chip', label, () => { filter = value; updateChips(); renderList(); });
+    chips.set(value, chip);
+    chipRow.append(chip);
+}
+const toolbarRow = element('div', 'toolbar-row');
+toolbarRow.append(searchInput, button('primary', 'Add', () => openAddForm()));
+toolbar.append(toolbarRow, chipRow);
+updateChips();
+root.append(banner, body);
+
+function updateChips(): void {
+    chips.forEach((chip, value) => chip.classList.toggle('active', value === filter));
+}
+
+// --- rendering ---
+
+function render(): void {
+    renderBanner();
+    if (!state) {
+        body.replaceChildren();
+        return;
+    }
+    switch (state.status) {
+        case 'unsupported':
+            body.replaceChildren(element('div', 'empty', 'This version of Cook Editor does not support the Pantry plugin. Please update Cook Editor.'));
+            return;
+        case 'noWorkspace':
+            body.replaceChildren(element('div', 'empty', 'Open a folder to use the pantry.'));
+            return;
+        case 'loading':
+            body.replaceChildren();
+            return;
+        case 'noFile': {
+            const box = element('div', 'empty');
+            box.append(element('p', undefined, 'No pantry yet. Your pantry lives in config/pantry.conf, shared with CookCLI and the shopping list.'));
+            box.append(button('primary', 'Create pantry', () => vscode.postMessage({ type: 'create' })));
+            body.replaceChildren(box);
+            return;
+        }
+        case 'parseError': {
+            const box = element('div', 'error');
+            box.append(element('p', undefined, `config/pantry.conf could not be read: ${state.parseError ?? ''}`));
+            box.append(button('secondary', 'Open file', () => vscode.postMessage({ type: 'openFile' })));
+            body.replaceChildren(box);
+            return;
+        }
+        case 'loaded':
+            if (!body.contains(toolbar)) {
+                body.replaceChildren(toolbar, addContainer, list);
+            }
+            renderAddForm();
+            renderList();
+            return;
+    }
+}
+
+function renderBanner(): void {
+    if (!state?.editError) {
+        banner.replaceChildren();
+        return;
+    }
+    const box = element('div', 'banner');
+    box.append(element('span', undefined, state.editError));
+    const close = button('icon', '×', () => vscode.postMessage({ type: 'dismissError' }));
+    close.title = 'Dismiss';
+    box.append(close);
+    banner.replaceChildren(box);
+}
+
+function openAddForm(): void {
+    if (state?.status !== 'loaded') {
+        return;
+    }
+    adding = { section: sectionChoices(state.sections)[0], name: '', quantity: '', low: '', bought: '', expire: '' };
+    renderAddForm();
+    addContainer.querySelector<HTMLInputElement>('.name-field input')?.focus();
+}
+
+function renderAddForm(): void {
+    if (!adding || state?.status !== 'loaded') {
+        addContainer.replaceChildren();
+        return;
+    }
+    const draft = adding;
+    const form = element('div', 'form add-form');
+    form.append(element('div', 'form-title', 'Add item'));
+
+    const sectionField = field('Section', draft.section, 'text', value => { draft.section = value; });
+    const options = element('datalist');
+    options.id = 'pantry-sections';
+    for (const name of sectionChoices(state.sections)) {
+        const option = element('option');
+        option.value = name;
+        options.append(option);
+    }
+    sectionField.querySelector('input')!.setAttribute('list', options.id);
+    const nameField = field('Name', draft.name, 'text', value => { draft.name = value; }, 'e.g. milk');
+    nameField.classList.add('name-field');
+
+    const grid = element('div', 'grid');
+    grid.append(
+        field('Quantity', draft.quantity, 'text', value => { draft.quantity = value; }, 'e.g. 500 g'),
+        field('Low at', draft.low, 'text', value => { draft.low = value; }, 'e.g. 100 g'),
+        field('Bought', draft.bought, 'date', value => { draft.bought = value; }),
+        field('Expires', draft.expire, 'date', value => { draft.expire = value; }),
+    );
+
+    const submit = (): void => {
+        const section = draft.section.trim();
+        const name = draft.name.trim();
+        if (!section || !name) {
+            form.classList.add('invalid');
+            return;
+        }
+        vscode.postMessage({ type: 'add', section, name, attributes: addAttributes(draft) });
+        adding = undefined;
+        renderAddForm();
+    };
+    const cancel = (): void => { adding = undefined; renderAddForm(); };
+    const actions = element('div', 'actions');
+    actions.append(button('primary', 'Add', submit), button('secondary', 'Cancel', cancel));
+    form.append(sectionField, options, nameField, grid, actions);
+    keys(form, submit, cancel);
+    addContainer.replaceChildren(form);
+}
+
+function renderList(): void {
+    if (state?.status !== 'loaded') {
+        return;
+    }
+    if (state.sections.length === 0) {
+        list.replaceChildren(element('div', 'empty', 'Your pantry is empty. Use Add to stock it.'));
+        return;
+    }
+    const today = todayIso(new Date());
+    const views = visibleSections(state.sections, search, filter, today);
+    if (views.length === 0) {
+        list.replaceChildren(element('div', 'empty', 'No items match.'));
+        return;
+    }
+    const narrowing = search.trim() !== '' || filter !== 'all';
+    list.replaceChildren(...views.map(view => {
+        const section = element('div', 'section');
+        const isCollapsed = collapsed.has(view.name) && !narrowing;
+        const count = narrowing ? `${view.items.length}/${view.total}` : String(view.total);
+        const header = button('section-header', `${isCollapsed ? '▶' : '▼'} ${view.name}`, () => {
+            if (collapsed.has(view.name)) { collapsed.delete(view.name); } else { collapsed.add(view.name); }
+            renderList();
+        });
+        header.append(element('span', 'count', count));
+        section.append(header);
+        if (!isCollapsed) {
+            view.items.forEach(item => section.append(itemRow(view.name, item, today)));
+        }
+        return section;
+    }));
+}
+
+function itemRow(section: string, item: PantryItem, today: string): HTMLElement {
+    const status = itemStatus(item, today);
+    const row = element('div', 'item');
+    const head = button('item-head', '', () => {
+        editing = isEditing(section, item) ? undefined : { section, name: item.name, draft: initialDraft(item) };
+        renderList();
+    });
+    const dot = element('span', `dot ${status}`);
+    dot.title = STATUS_LABELS[status];
+    head.append(dot, element('span', 'item-name', item.name));
+    if (item.quantity) {
+        head.append(element('span', 'item-qty', displayQuantity(item.quantity)));
+    }
+    if (item.expireDate) {
+        head.append(element('span', `badge ${status}`, expiryLabel(daysUntil(item.expireDate, today))));
+    }
+    row.append(head);
+    if (editing && isEditing(section, item)) {
+        row.append(editForm(section, item, editing.draft));
+    }
+    return row;
+}
+
+function isEditing(section: string, item: PantryItem): boolean {
+    return editing?.section === section && editing.name === item.name;
+}
+
+function editForm(section: string, item: PantryItem, draft: EditDraft): HTMLElement {
+    const form = element('div', 'form');
+    const grid = element('div', 'grid');
+    grid.append(
+        field('Quantity', draft.quantity, 'text', value => { draft.quantity = value; }, 'e.g. 500 g'),
+        field('Low at', draft.low, 'text', value => { draft.low = value; }, 'e.g. 100 g'),
+        field('Bought', draft.bought, 'date', value => { draft.bought = value; }),
+        field('Expires', draft.expire, 'date', value => { draft.expire = value; }),
+    );
+    const close = (): void => { editing = undefined; renderList(); };
+    const save = (): void => {
+        const fields = changedFields(item, draft);
+        if (Object.keys(fields).length > 0) {
+            vscode.postMessage({ type: 'update', section, name: item.name, fields });
+        }
+        close();
+    };
+    const actions = element('div', 'actions');
+    actions.append(
+        button('primary', 'Save', save),
+        button('secondary', 'Cancel', close),
+        button('danger', 'Delete', () => { vscode.postMessage({ type: 'remove', section, name: item.name }); close(); }),
+    );
+    form.append(grid, actions);
+    keys(form, save, close);
+    return form;
+}
+
+window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
+    const message = event.data;
+    if (message?.type === 'state') {
+        state = message.state;
+        // Drop the edit form if its item is gone (removed here or edited outside).
+        if (editing && !state.sections.some(s => s.name === editing!.section && s.items.some(i => i.name === editing!.name))) {
+            editing = undefined;
+        }
+        render();
+    } else if (message?.type === 'showAdd') {
+        openAddForm();
+    }
+});
+vscode.postMessage({ type: 'ready' });

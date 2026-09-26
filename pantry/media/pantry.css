@@ -1,0 +1,133 @@
+body {
+    padding: 0;
+    color: var(--vscode-foreground);
+    font-family: var(--vscode-font-family);
+    font-size: var(--vscode-font-size);
+    line-height: 1.5;
+}
+
+#root { padding: 10px 12px; }
+
+button { font-family: inherit; font-size: inherit; cursor: pointer; }
+
+input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 3px 6px;
+    font-family: inherit;
+    font-size: inherit;
+    background: var(--vscode-input-background);
+    color: var(--vscode-input-foreground);
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+    border-radius: 2px;
+}
+
+input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px; }
+
+.empty { padding: 16px 4px; color: var(--vscode-descriptionForeground); text-align: center; }
+.empty p { margin: 0 0 10px 0; }
+.error { padding: 8px 0; color: var(--vscode-errorForeground); }
+.error p { margin: 0 0 8px 0; }
+
+.banner {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+    padding: 6px 8px;
+    background: var(--vscode-inputValidation-errorBackground);
+    border: 1px solid var(--vscode-inputValidation-errorBorder);
+}
+
+.banner span { flex: 1; }
+
+.primary, .secondary, .danger {
+    padding: 3px 10px;
+    border: 1px solid transparent;
+    border-radius: 2px;
+}
+
+.primary { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+.primary:hover { background: var(--vscode-button-hoverBackground); }
+.secondary { background: var(--vscode-button-secondaryBackground); color: var(--vscode-button-secondaryForeground); }
+.secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+.danger { background: none; color: var(--vscode-errorForeground); border-color: var(--vscode-errorForeground); margin-left: auto; }
+.icon { background: none; border: none; color: inherit; padding: 0 2px; }
+
+.toolbar { margin-bottom: 10px; }
+.toolbar-row { display: flex; gap: 6px; }
+.chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+
+.chip {
+    padding: 1px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--vscode-panel-border);
+    background: none;
+    color: var(--vscode-descriptionForeground);
+    font-size: 0.9em;
+}
+
+.chip.active {
+    background: var(--vscode-badge-background);
+    color: var(--vscode-badge-foreground);
+    border-color: var(--vscode-badge-background);
+}
+
+.form {
+    padding: 8px;
+    margin: 4px 0 8px 0;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 3px;
+    background: var(--vscode-editorWidget-background);
+}
+
+.form.invalid .name-field input:placeholder-shown { border-color: var(--vscode-inputValidation-errorBorder); }
+.form-title { font-weight: 600; margin-bottom: 6px; }
+.field { display: block; margin-bottom: 6px; }
+.field-label { display: block; font-size: 0.85em; color: var(--vscode-descriptionForeground); }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 0 8px; }
+.actions { display: flex; gap: 6px; margin-top: 4px; }
+
+.section { margin-bottom: 8px; }
+
+.section-header {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    padding: 4px 0;
+    background: none;
+    border: none;
+    border-bottom: 1px solid var(--vscode-panel-border);
+    color: var(--vscode-foreground);
+    font-weight: 600;
+    font-size: 0.85em;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    text-align: left;
+}
+
+.count { margin-left: auto; color: var(--vscode-descriptionForeground); font-weight: normal; }
+
+.item-head {
+    display: flex;
+    width: 100%;
+    align-items: center;
+    gap: 8px;
+    padding: 3px 2px;
+    background: none;
+    border: none;
+    color: var(--vscode-foreground);
+    text-align: left;
+}
+
+.item-head:hover { background: var(--vscode-list-hoverBackground); }
+.item-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-qty { color: var(--vscode-descriptionForeground); font-size: 0.9em; white-space: nowrap; }
+
+.dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; background: var(--vscode-testing-iconPassed); }
+.dot.low, .dot.expiring { background: var(--vscode-editorWarning-foreground); }
+.dot.out, .dot.expired { background: var(--vscode-errorForeground); }
+
+.badge { font-size: 0.8em; padding: 0 6px; border-radius: 8px; white-space: nowrap; color: var(--vscode-descriptionForeground); }
+.badge.expiring, .badge.low { color: var(--vscode-editorWarning-foreground); }
+.badge.expired, .badge.out { color: var(--vscode-errorForeground); }
