@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import { NAMES_TEMPLATE, STANDARD_TEMPLATE } from './allergen-template';
 import { CooklangApi, PluginReportResult } from './cooklang-api';
-import { LOCKED_TOOLTIP } from './hover';
+import { LOCKED_TOOLTIP, UNCHECKED_LINE } from './hover';
 import { AllergenBadgeProvider } from './provider';
 import { AllergenSettings, readSettings } from './settings';
 
@@ -106,17 +106,64 @@ describe('AllergenBadgeProvider', () => {
         assert.strictEqual((await s.provider.provide(CONTEXT))?.text, '🔒 Allergens');
     });
 
-    it('shows nothing on other failures and logs each reason once', async () => {
+    it('logs a refusal once across provides on the custom-word fallback', async () => {
+        const forbidden: PluginReportResult = { ok: false, reason: 'forbidden', message: 'subscription required: x' };
+        const s = setup({ values: { milk: true, custom: ['coriander'] }, results: [forbidden, namesOutput, forbidden, namesOutput] });
+        await s.provider.provide(CONTEXT);
+        await s.provider.provide(CONTEXT);
+        assert.deepStrictEqual(s.logs, ['Allergens unavailable (forbidden): subscription required: x']);
+    });
+
+    it('warns in amber without a second render when the service is unreachable and there are no custom words', async () => {
         const failure: PluginReportResult = { ok: false, reason: 'network', message: 'offline' };
         const s = setup({ values: { milk: true }, results: [failure, failure] });
+        const badge = await s.provider.provide(CONTEXT);
+        assert.deepStrictEqual([badge?.tone, badge?.text], ['warning', '⚠ Check allergens']);
+        assert.ok(badge?.tooltipMarkdown.includes(UNCHECKED_LINE));
+        assert.ok(!badge?.tooltipMarkdown.includes('Cook Basic or Pro'));
+        assert.strictEqual((await s.provider.provide(CONTEXT))?.text, '⚠ Check allergens');
+        assert.deepStrictEqual(s.templates, [STANDARD_TEMPLATE, STANDARD_TEMPLATE]);
+        assert.deepStrictEqual(s.logs, ['Allergens unavailable (network): offline']);
+    });
+
+    for (const reason of ['server', 'template'] as const) {
+        it(`falls back to custom words and says the standard allergens weren't checked on a ${reason} failure`, async () => {
+            const s = setup({ values: { milk: true, custom: ['coriander'] }, results: [{ ok: false, reason, message: 'x' }, namesOutput] });
+            const badge = await s.provider.provide(CONTEXT);
+            assert.deepStrictEqual([badge?.tone, badge?.text], ['bad', '⚠ coriander']);
+            assert.ok(badge?.tooltipMarkdown.includes(UNCHECKED_LINE));
+            assert.deepStrictEqual(s.templates, [STANDARD_TEMPLATE, NAMES_TEMPLATE]);
+        });
+    }
+
+    it('treats malformed standard output as unchecked', async () => {
+        const s = setup({ values: { milk: true }, results: [{ ok: true, output: '{}' }] });
+        const badge = await s.provider.provide(CONTEXT);
+        assert.strictEqual(badge?.text, '⚠ Check allergens');
+        assert.ok(badge?.tooltipMarkdown.includes(UNCHECKED_LINE));
+        assert.deepStrictEqual(s.logs, ['Allergens unavailable (output): unexpected template output']);
+    });
+
+    it('shows nothing when the names-only render fails, logging each reason once', async () => {
+        const failure: PluginReportResult = { ok: false, reason: 'network', message: 'offline' };
+        const s = setup({ values: { milk: true, custom: ['coriander'] }, results: [failure, failure, failure, failure] });
         assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
         assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
         assert.deepStrictEqual(s.logs, ['Allergens unavailable (network): offline']);
     });
 
-    it('shows nothing for malformed output', async () => {
-        const s = setup({ values: { milk: true }, results: [{ ok: true, output: '{}' }] });
+    it('shows nothing for malformed names-only output', async () => {
+        const s = setup({ values: { custom: ['coriander'] }, results: [{ ok: true, output: '{}' }] });
         assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
         assert.deepStrictEqual(s.logs, ['Allergens unavailable (output): unexpected template output']);
+    });
+
+    it('logs a failure again after a successful render', async () => {
+        const failure: PluginReportResult = { ok: false, reason: 'network', message: 'offline' };
+        const s = setup({ values: { milk: true }, results: [failure, standardOutput, failure] });
+        await s.provider.provide(CONTEXT);
+        await s.provider.provide(CONTEXT);
+        await s.provider.provide(CONTEXT);
+        assert.strictEqual(s.logs.length, 2);
     });
 });

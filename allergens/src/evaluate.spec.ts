@@ -2,7 +2,7 @@ import * as assert from 'assert';
 import { ALLERGEN_CLASSES } from './allergen-classes';
 import { IngredientAllergens } from './allergen-template';
 import { badgeFor, findAllergens, pillText } from './evaluate';
-import { LOCKED_TOOLTIP } from './hover';
+import { LOCKED_TOOLTIP, UNCHECKED_LINE } from './hover';
 
 const cls = (...slugs: string[]) => ALLERGEN_CLASSES.filter(c => slugs.includes(c.slug));
 const verified = (name: string, ...contains: IngredientAllergens['contains']): IngredientAllergens => ({ name, status: 'verified', contains });
@@ -31,7 +31,7 @@ describe('findAllergens', () => {
 
     it('reports no unknowns when no class is checked', () => {
         const findings = findAllergens([], ['kiwi'], { names, refs: [], ingredients: undefined });
-        assert.deepStrictEqual(findings, { pillLabels: [], lines: [], unknown: [] });
+        assert.deepStrictEqual(findings, { pillLabels: [], lines: [], unknown: [], standardUnchecked: false });
     });
 
     it('matches custom words against linked recipes too, but still reports them as unchecked', () => {
@@ -62,9 +62,10 @@ describe('pillText', () => {
 });
 
 describe('badgeFor', () => {
-    const hit = { pillLabels: ['Milk'], lines: [{ label: 'Milk', ingredients: ['butter'] }], unknown: [] };
-    const unsure = { pillLabels: [], lines: [], unknown: ['saffron'] };
-    const clear = { pillLabels: [], lines: [], unknown: [] };
+    const hit = { pillLabels: ['Milk'], lines: [{ label: 'Milk', ingredients: ['butter'] }], unknown: [], standardUnchecked: false };
+    const unsure = { pillLabels: [], lines: [], unknown: ['saffron'], standardUnchecked: false };
+    const clear = { pillLabels: [], lines: [], unknown: [], standardUnchecked: false };
+    const unreachable = { ...clear, standardUnchecked: true };
 
     it('flags hits in red', () => {
         const badge = badgeFor(hit, false, true);
@@ -74,6 +75,13 @@ describe('badgeFor', () => {
 
     it('warns in amber when nothing matched but something could not be checked', () => {
         assert.deepStrictEqual([badgeFor(unsure, false, true)?.tone, badgeFor(unsure, false, true)?.text], ['warning', '⚠ Check allergens']);
+    });
+
+    it('warns in amber when the standard classes could not be checked, even with nothing unknown', () => {
+        const badge = badgeFor(unreachable, false, true);
+        assert.deepStrictEqual([badge?.tone, badge?.text], ['warning', '⚠ Check allergens']);
+        assert.ok(badge?.tooltipMarkdown.includes(UNCHECKED_LINE));
+        assert.strictEqual(badgeFor({ ...hit, standardUnchecked: true }, false, true)?.tone, 'bad');
     });
 
     it('shows nothing when everything was checked and nothing matched', () => {

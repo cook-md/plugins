@@ -8,10 +8,13 @@ export interface AllergenFindings {
     lines: Array<{ label: string; ingredients: string[] }>;
     /** Ingredient names whose allergens couldn't be checked. */
     unknown: string[];
+    /** Standard classes are ticked, but the nutrition service couldn't be reached (or answered nonsense). */
+    standardUnchecked: boolean;
 }
 
 const MAX_LINES = 8;
 export const DISCLAIMER = '_Informational only — always check product labels._';
+export const UNCHECKED_LINE = "Couldn't reach the cook.md nutrition service, so the standard allergens weren't checked.";
 export const LOCKED_LINE = 'Checking the standard allergens needs a Cook Basic or Pro plan. [See plans](https://cook.md/pricing)';
 
 /** Tooltip of the neutral "🔒 Allergens" pill. */
@@ -21,8 +24,18 @@ Sign in to cook.md with a Cook Basic or Pro plan to check recipes for the allerg
 
 [See plans](https://cook.md/pricing)`;
 
+/**
+ * Title, what wasn't checked (never dropped), the hits, the locked line and the disclaimer.
+ * `locked`: add the "needs a Cook Basic or Pro plan" line.
+ */
 export function hoverMarkdown(findings: AllergenFindings, locked: boolean): string {
     const blocks = ['**Allergens**'];
+    if (findings.standardUnchecked) {
+        blocks.push(UNCHECKED_LINE);
+    }
+    if (findings.unknown.length > 0) {
+        blocks.push(`Couldn't check: ${formatNames(findings.unknown)}`);
+    }
     if (findings.lines.length > 0) {
         const shown = findings.lines.slice(0, MAX_LINES)
             .map(line => `- **${escapeMarkdown(truncateName(line.label))}** — ${formatNames(line.ingredients)}`);
@@ -32,9 +45,6 @@ export function hoverMarkdown(findings: AllergenFindings, locked: boolean): stri
         blocks.push(shown.join('\n'));
     } else if (findings.unknown.length > 0) {
         blocks.push('None of your allergens were found in the ingredients that could be checked.');
-    }
-    if (findings.unknown.length > 0) {
-        blocks.push(`Couldn't check: ${formatNames(findings.unknown)}`);
     }
     if (locked) {
         blocks.push(LOCKED_LINE);

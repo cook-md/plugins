@@ -21,7 +21,7 @@ export function findAllergens(
     output: Readonly<AllergenOutput>,
 ): AllergenFindings {
     const { names, refs, ingredients } = output;
-    const findings: AllergenFindings = { pillLabels: [], lines: [], unknown: [] };
+    const findings: AllergenFindings = { pillLabels: [], lines: [], unknown: [], standardUnchecked: false };
     for (const allergenClass of classes) {
         const byLabel = new Map<string, string[]>();
         for (const ingredient of ingredients ?? []) {
@@ -73,8 +73,9 @@ export function pillText(labels: readonly string[]): string {
 }
 
 /**
- * Red when something matched, amber when nothing matched but something couldn't be checked,
- * the neutral locked pill when the standard classes couldn't be checked at all, else nothing.
+ * Red when something matched; amber when nothing matched but something couldn't be checked
+ * (unknown ingredients, linked recipes, or the service was unreachable); the neutral locked
+ * pill when the plan doesn't cover the standard classes; else nothing.
  * `locked`: standard classes are ticked but the plan doesn't include nutrition data.
  */
 export function badgeFor(findings: AllergenFindings, locked: boolean, showWhenLocked: boolean): PillBadge | undefined {
@@ -82,7 +83,7 @@ export function badgeFor(findings: AllergenFindings, locked: boolean, showWhenLo
     if (findings.pillLabels.length > 0) {
         return { kind: 'pill', text: pillText(findings.pillLabels), tone: 'bad', tooltipMarkdown: hoverMarkdown(findings, showLock) };
     }
-    if (findings.unknown.length > 0) {
+    if (findings.unknown.length > 0 || findings.standardUnchecked) {
         return { kind: 'pill', text: WARNING_TEXT, tone: 'warning', tooltipMarkdown: hoverMarkdown(findings, showLock) };
     }
     if (showLock) {
