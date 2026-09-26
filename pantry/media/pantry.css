@@ -106,6 +106,8 @@ input:focus { outline: 1px solid var(--vscode-focusBorder); outline-offset: -1px
     text-align: left;
 }
 
+.section-header .glyph { margin-right: 0.4em; }
+
 .count { margin-left: auto; color: var(--vscode-descriptionForeground); font-weight: normal; }
 
 .item-head {

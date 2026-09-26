@@ -106,7 +106,10 @@ updateChips();
 root.append(banner, body);
 
 function updateChips(): void {
-    chips.forEach((chip, value) => chip.classList.toggle('active', value === filter));
+    chips.forEach((chip, value) => {
+        chip.classList.toggle('active', value === filter);
+        chip.setAttribute('aria-pressed', String(value === filter));
+    });
 }
 
 // --- rendering ---
@@ -241,14 +244,15 @@ function renderList(): void {
         const section = element('div', 'section');
         const isCollapsed = collapsed.has(view.name) && !narrowing;
         const count = narrowing ? `${view.items.length}/${view.total}` : String(view.total);
-        const header = button('section-header', `${isCollapsed ? '▶' : '▼'} ${view.name}`, () => {
+        const header = button('section-header', '', () => {
             if (narrowing) {
                 return; // sections are always expanded while searching or filtering
             }
             if (collapsed.has(view.name)) { collapsed.delete(view.name); } else { collapsed.add(view.name); }
             renderList();
         });
-        header.append(element('span', 'count', count));
+        header.setAttribute('aria-expanded', String(!isCollapsed));
+        header.append(glyph(isCollapsed), element('span', undefined, view.name), element('span', 'count', count));
         section.append(header);
         if (!isCollapsed) {
             view.items.forEach(item => section.append(itemRow(view.name, item, today)));
@@ -269,8 +273,12 @@ function itemRow(section: string, item: PantryItem, today: string): HTMLElement 
         renderList();
         list.querySelector<HTMLInputElement>('.item.editing input')?.focus();
     });
+    const open = isEditing(section, item);
+    head.setAttribute('aria-expanded', String(open));
     const dot = element('span', `dot ${status}`);
     dot.title = STATUS_LABELS[status];
+    dot.setAttribute('role', 'img');
+    dot.setAttribute('aria-label', STATUS_LABELS[status]);
     head.append(dot, element('span', 'item-name', item.name));
     if (item.quantity) {
         head.append(element('span', 'item-qty', displayQuantity(item.quantity)));
@@ -279,11 +287,18 @@ function itemRow(section: string, item: PantryItem, today: string): HTMLElement 
         head.append(element('span', `badge ${status}`, expiryLabel(daysUntil(item.expireDate, today))));
     }
     row.append(head);
-    if (editing && isEditing(section, item)) {
+    if (editing && open) {
         row.classList.add('editing');
         row.append(editForm(section, item, editing.base, editing.draft));
     }
     return row;
+}
+
+/** The ▶/▼ disclosure marker; hidden from screen readers, which get `aria-expanded` instead. */
+function glyph(collapsedState: boolean): HTMLElement {
+    const marker = element('span', 'glyph', collapsedState ? '▶' : '▼');
+    marker.setAttribute('aria-hidden', 'true');
+    return marker;
 }
 
 function isEditing(section: string, item: PantryItem): boolean {
