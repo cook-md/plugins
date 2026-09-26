@@ -1,0 +1,45 @@
+{
+  "name": "nutriscore",
+  "displayName": "Nutri-Score",
+  "description": "Nutri-Score badge on recipe previews, computed from the cook.md nutrition service, with a hover card showing how reliable it is. Needs a Basic or Pro plan.",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/cook-md/plugins.git", "directory": "nutriscore" },
+  "keywords": ["cooklang", "nutrition", "nutri-score", "recipes"],
+  "engines": { "vscode": "^1.100.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "cooklang.nutriscore.provideBadge", "title": "Nutri-Score", "category": "Nutri-Score" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "cooklang.nutriscore.provideBadge", "when": "false" }
+      ],
+      "cooklang/recipePreview/badge": [
+        { "command": "cooklang.nutriscore.provideBadge" }
+      ]
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath nutriscore-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^18.19.0",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^3.3.0",
+    "mocha": "^10.4.0",
+    "ovsx": "^1.0.0",
+    "typescript": "~5.4.5"
+  }
+}
