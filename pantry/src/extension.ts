@@ -14,7 +14,12 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         version = undefined;
     }
     // Without the pantry API the view still opens and asks the user to update.
-    const supported = version === SUPPORTED_API_VERSION && await api.supportsPantry();
+    let supported = false;
+    try {
+        supported = version === SUPPORTED_API_VERSION && await api.supportsPantry();
+    } catch {
+        supported = false;
+    }
     new PantryController(context, api, supported).start();
 }
 

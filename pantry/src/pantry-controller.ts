@@ -39,6 +39,8 @@ export class PantryController implements vscode.WebviewViewProvider {
 
     protected store: PantryStore | undefined;
     protected storeDisposables: vscode.Disposable[] = [];
+    /** The folder `store` was opened for (as a URI string), to ignore folder changes that keep it. */
+    protected storeFolder: string | undefined;
     protected view: vscode.WebviewView | undefined;
     /** `pantry.addItem` ran before the webview was ready. */
     protected pendingShowAdd = false;
@@ -56,7 +58,11 @@ export class PantryController implements vscode.WebviewViewProvider {
             vscode.commands.registerCommand('pantry.show', () => this.reveal()),
             vscode.commands.registerCommand('pantry.addItem', () => this.showAdd()),
             vscode.commands.registerCommand('pantry.openFile', () => this.openFile()),
-            vscode.workspace.onDidChangeWorkspaceFolders(() => this.openStore()),
+            vscode.workspace.onDidChangeWorkspaceFolders(() => {
+                if (this.folder()?.uri.toString() !== this.storeFolder) {
+                    this.openStore();
+                }
+            }),
             { dispose: () => this.closeStore() },
         );
         this.openStore();
@@ -90,6 +96,7 @@ export class PantryController implements vscode.WebviewViewProvider {
     protected openStore(): void {
         this.closeStore();
         const folder = this.folder();
+        this.storeFolder = folder?.uri.toString();
         if (!this.supported || !folder) {
             this.postState();
             return;
@@ -161,6 +168,9 @@ export class PantryController implements vscode.WebviewViewProvider {
                 const name = message.name.trim();
                 const choice = await vscode.window.showWarningMessage(
                     `Remove "${name}" from ${section}?`, { modal: true }, 'Remove');
+                if (store !== this.store) {
+                    return; // the workspace folder changed while the dialog was open
+                }
                 if (choice === 'Remove') {
                     await store.edit({ op: 'remove', section, name });
                 }
@@ -192,13 +202,14 @@ export class PantryController implements vscode.WebviewViewProvider {
         this.view?.webview.postMessage(message);
     }
 
+    /** Reveals the view first; if the webview cannot take the message now, it gets it after `ready`. */
     protected async showAdd(): Promise<void> {
-        if (this.view) {
-            this.post({ type: 'showAdd' });
-        } else {
-            this.pendingShowAdd = true;
-        }
         await this.reveal();
+        const view = this.view;
+        if (view?.visible && await view.webview.postMessage({ type: 'showAdd' } satisfies ToWebview)) {
+            return;
+        }
+        this.pendingShowAdd = true;
     }
 
     protected async openFile(): Promise<void> {
@@ -209,9 +220,15 @@ export class PantryController implements vscode.WebviewViewProvider {
         }
         const uri = vscode.Uri.joinPath(folder.uri, PANTRY_FILE);
         try {
-            await vscode.window.showTextDocument(uri);
+            await vscode.workspace.fs.stat(uri);
         } catch {
             vscode.window.showInformationMessage(`There is no ${PANTRY_FILE} yet. Use "Create pantry" in the Pantry view.`);
+            return;
+        }
+        try {
+            await vscode.window.showTextDocument(uri);
+        } catch (e) {
+            vscode.window.showErrorMessage(`Pantry: could not open ${PANTRY_FILE}: ${e instanceof Error ? e.message : String(e)}`);
         }
     }
 
