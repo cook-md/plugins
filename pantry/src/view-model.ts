@@ -106,6 +106,11 @@ export function sectionChoices(sections: readonly PantrySection[]): string[] {
     return sections.length > 0 ? sections.map(section => section.name) : [...DEFAULT_SECTIONS];
 }
 
+/** Where the add form starts: the first choice that is not the catch-all `general` section. */
+export function defaultAddSection(choices: readonly string[]): string {
+    return choices.find(name => name !== 'general') ?? choices[0];
+}
+
 export function initialDraft(item: PantryItem): EditDraft {
     return {
         quantity: item.quantity ? displayQuantity(item.quantity) : '',

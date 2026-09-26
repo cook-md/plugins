@@ -1,7 +1,7 @@
 import type { PantryItem } from '../cooklang-api';
 import type { FromWebview, ToWebview, ViewState } from '../protocol';
 import {
-    EditDraft, ItemStatus, PantryFilter, addAttributes, changedFields, daysUntil, displayQuantity, expiryLabel,
+    EditDraft, ItemStatus, PantryFilter, addAttributes, changedFields, daysUntil, defaultAddSection, displayQuantity, expiryLabel,
     initialDraft, itemStatus, sectionChoices, todayIso, visibleSections,
 } from '../view-model';
 
@@ -23,6 +23,8 @@ const collapsed = new Set<string>();
 /** `base` is the draft as the form opened; saving sends only what differs from it. */
 let editing: { section: string; name: string; base: EditDraft; draft: EditDraft } | undefined;
 let adding: ({ section: string; name: string } & EditDraft) | undefined;
+/** `pantry.addItem` arrived before the pantry was loaded; open the add form once it is. */
+let wantAdd = false;
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
     const node = document.createElement(tag);
@@ -38,11 +40,15 @@ function button(className: string, text: string, onClick: () => void): HTMLButto
     return node;
 }
 
-/** A labelled input; date fields fall back to text when the stored value is not ISO. */
-function field(label: string, value: string, kind: 'text' | 'date', onInput: (value: string) => void, placeholder = ''): HTMLLabelElement {
+/**
+ * A labelled input; date fields fall back to text when the stored value is not ISO.
+ * `key` becomes `data-field`, used to restore focus after the list is rebuilt.
+ */
+function field(key: string, label: string, value: string, kind: 'text' | 'date', onInput: (value: string) => void, placeholder = ''): HTMLLabelElement {
     const wrapper = element('label', 'field');
     wrapper.append(element('span', 'field-label', label));
     const input = element('input');
+    input.dataset.field = key;
     input.type = kind === 'date' && (value === '' || ISO_DATE.test(value)) ? 'date' : 'text';
     input.value = value;
     input.placeholder = placeholder;
@@ -51,10 +57,25 @@ function field(label: string, value: string, kind: 'text' | 'date', onInput: (va
     return wrapper;
 }
 
-/** Enter submits and Escape cancels, for every input inside `form`. */
+/** The quantity, low and date inputs shared by the add and edit forms. */
+function draftFields(draft: EditDraft): HTMLElement {
+    const grid = element('div', 'grid');
+    grid.append(
+        field('quantity', 'Quantity', draft.quantity, 'text', value => { draft.quantity = value; }, 'e.g. 500 g'),
+        field('low', 'Low at', draft.low, 'text', value => { draft.low = value; }, 'e.g. 100 g'),
+        field('bought', 'Bought', draft.bought, 'date', value => { draft.bought = value; }),
+        field('expire', 'Expires', draft.expire, 'date', value => { draft.expire = value; }),
+    );
+    return grid;
+}
+
+/** Enter in an input submits (buttons keep their own Enter, IME composition is left alone); Escape cancels. */
 function keys(form: HTMLElement, submit: () => void, cancel: () => void): void {
     form.addEventListener('keydown', event => {
-        if (event.key === 'Enter') { event.preventDefault(); submit(); }
+        if (event.key === 'Enter' && event.target instanceof HTMLInputElement && !event.isComposing) {
+            event.preventDefault();
+            submit();
+        }
         if (event.key === 'Escape') { event.preventDefault(); cancel(); }
     });
 }
@@ -124,7 +145,10 @@ function render(): void {
             if (!body.contains(toolbar)) {
                 body.replaceChildren(toolbar, addContainer, list);
             }
-            renderAddForm();
+            // An open add form is only rebuilt when it opens or closes, so typing is never interrupted.
+            if (!adding || !addContainer.firstChild) {
+                renderAddForm();
+            }
             renderList();
             return;
     }
@@ -147,8 +171,10 @@ function openAddForm(): void {
     if (state?.status !== 'loaded') {
         return;
     }
-    adding = { section: sectionChoices(state.sections)[0], name: '', quantity: '', low: '', bought: '', expire: '' };
-    renderAddForm();
+    if (!adding) {
+        adding = { section: defaultAddSection(sectionChoices(state.sections)), name: '', quantity: '', low: '', bought: '', expire: '' };
+        renderAddForm();
+    }
     addContainer.querySelector<HTMLInputElement>('.name-field input')?.focus();
 }
 
@@ -161,7 +187,7 @@ function renderAddForm(): void {
     const form = element('div', 'form add-form');
     form.append(element('div', 'form-title', 'Add item'));
 
-    const sectionField = field('Section', draft.section, 'text', value => { draft.section = value; });
+    const sectionField = field('section', 'Section', draft.section, 'text', value => { draft.section = value; });
     const options = element('datalist');
     options.id = 'pantry-sections';
     for (const name of sectionChoices(state.sections)) {
@@ -170,16 +196,9 @@ function renderAddForm(): void {
         options.append(option);
     }
     sectionField.querySelector('input')!.setAttribute('list', options.id);
-    const nameField = field('Name', draft.name, 'text', value => { draft.name = value; }, 'e.g. milk');
+    const nameField = field('name', 'Name', draft.name, 'text', value => { draft.name = value; }, 'e.g. milk');
     nameField.classList.add('name-field');
-
-    const grid = element('div', 'grid');
-    grid.append(
-        field('Quantity', draft.quantity, 'text', value => { draft.quantity = value; }, 'e.g. 500 g'),
-        field('Low at', draft.low, 'text', value => { draft.low = value; }, 'e.g. 100 g'),
-        field('Bought', draft.bought, 'date', value => { draft.bought = value; }),
-        field('Expires', draft.expire, 'date', value => { draft.expire = value; }),
-    );
+    const grid = draftFields(draft);
 
     const submit = (): void => {
         const section = draft.section.trim();
@@ -215,11 +234,17 @@ function renderList(): void {
         return;
     }
     const narrowing = search.trim() !== '' || filter !== 'all';
+    // Remember which edit-form input had focus so the rebuilt form gets it back.
+    const active = document.activeElement;
+    const focusedField = active instanceof HTMLInputElement && list.contains(active) ? active.dataset.field : undefined;
     list.replaceChildren(...views.map(view => {
         const section = element('div', 'section');
         const isCollapsed = collapsed.has(view.name) && !narrowing;
         const count = narrowing ? `${view.items.length}/${view.total}` : String(view.total);
         const header = button('section-header', `${isCollapsed ? '▶' : '▼'} ${view.name}`, () => {
+            if (narrowing) {
+                return; // sections are always expanded while searching or filtering
+            }
             if (collapsed.has(view.name)) { collapsed.delete(view.name); } else { collapsed.add(view.name); }
             renderList();
         });
@@ -230,6 +255,9 @@ function renderList(): void {
         }
         return section;
     }));
+    if (focusedField) {
+        list.querySelector<HTMLInputElement>(`.item.editing input[data-field="${focusedField}"]`)?.focus();
+    }
 }
 
 function itemRow(section: string, item: PantryItem, today: string): HTMLElement {
@@ -239,6 +267,7 @@ function itemRow(section: string, item: PantryItem, today: string): HTMLElement 
         const base = initialDraft(item);
         editing = isEditing(section, item) ? undefined : { section, name: item.name, base, draft: { ...base } };
         renderList();
+        list.querySelector<HTMLInputElement>('.item.editing input')?.focus();
     });
     const dot = element('span', `dot ${status}`);
     dot.title = STATUS_LABELS[status];
@@ -251,6 +280,7 @@ function itemRow(section: string, item: PantryItem, today: string): HTMLElement 
     }
     row.append(head);
     if (editing && isEditing(section, item)) {
+        row.classList.add('editing');
         row.append(editForm(section, item, editing.base, editing.draft));
     }
     return row;
@@ -262,13 +292,7 @@ function isEditing(section: string, item: PantryItem): boolean {
 
 function editForm(section: string, item: PantryItem, base: EditDraft, draft: EditDraft): HTMLElement {
     const form = element('div', 'form');
-    const grid = element('div', 'grid');
-    grid.append(
-        field('Quantity', draft.quantity, 'text', value => { draft.quantity = value; }, 'e.g. 500 g'),
-        field('Low at', draft.low, 'text', value => { draft.low = value; }, 'e.g. 100 g'),
-        field('Bought', draft.bought, 'date', value => { draft.bought = value; }),
-        field('Expires', draft.expire, 'date', value => { draft.expire = value; }),
-    );
+    const grid = draftFields(draft);
     const close = (): void => { editing = undefined; renderList(); };
     const save = (): void => {
         const fields = changedFields(base, draft);
@@ -281,7 +305,8 @@ function editForm(section: string, item: PantryItem, base: EditDraft, draft: Edi
     actions.append(
         button('primary', 'Save', save),
         button('secondary', 'Cancel', close),
-        button('danger', 'Delete', () => { vscode.postMessage({ type: 'remove', section, name: item.name }); close(); }),
+        // The form stays open until the removal lands (the next state drops it) or the confirmation is cancelled.
+        button('danger', 'Delete', () => vscode.postMessage({ type: 'remove', section, name: item.name })),
     );
     form.append(grid, actions);
     keys(form, save, close);
@@ -297,8 +322,16 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
             editing = undefined;
         }
         render();
+        if (wantAdd && state.status === 'loaded') {
+            wantAdd = false;
+            openAddForm();
+        }
     } else if (message?.type === 'showAdd') {
-        openAddForm();
+        if (state?.status === 'loaded') {
+            openAddForm();
+        } else {
+            wantAdd = true;
+        }
     }
 });
 vscode.postMessage({ type: 'ready' });

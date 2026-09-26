@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import type { PantryItem, PantrySection } from './cooklang-api';
 import {
-    addAttributes, changedFields, daysUntil, displayQuantity, expiryLabel, initialDraft, itemStatus,
+    addAttributes, changedFields, daysUntil, defaultAddSection, displayQuantity, expiryLabel, initialDraft, itemStatus,
     matchesFilter, sectionChoices, storedQuantity, todayIso, visibleSections,
 } from './view-model';
 
@@ -102,6 +102,12 @@ describe('view-model', () => {
         const draft = { ...base, quantity: '2 L' };
         // Meanwhile someone else set low to 300 ml in pantry.conf; the draft still holds the old 200 ml.
         assert.deepStrictEqual(changedFields(base, draft), { quantity: '2%L' });
+    });
+
+    it('defaults the add form to the first section that is not general', () => {
+        assert.strictEqual(defaultAddSection(['general', 'fridge', 'freezer']), 'fridge');
+        assert.strictEqual(defaultAddSection(['cellar', 'general']), 'cellar');
+        assert.strictEqual(defaultAddSection(['general']), 'general');
     });
 
     it('builds add attributes from non-empty fields only', () => {
