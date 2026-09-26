@@ -1,7 +1,7 @@
 {
   "name": "recipe-hub",
   "displayName": "Recipe Hub",
-  "description": "Search the public Cooklang recipe index (recipes.cooklang.org), preview any recipe, and save it to your Drafts. Ships with Cook Editor.",
+  "description": "Search the public Cooklang recipe index (recipes.cooklang.org), preview any recipe, and save it to your Drafts.",
   "version": "0.1.0",
   "publisher": "cooklang",
   "license": "MIT",

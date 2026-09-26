@@ -7,7 +7,7 @@ writing your own. Each plugin is a standalone npm package in its own folder.
 |---|---|
 | [`meal-journal`](./meal-journal) | Daily meal journal in Cooklang markup. **Start here** — it demonstrates the most common plugin APIs. |
 | [`shopping-list`](./shopping-list) | Aisle-grouped shopping lists with pantry subtraction. Ships with Cook Editor. Shows the Cooklang API and outlets. |
-| [`recipe-hub`](./recipe-hub) | Search recipes.cooklang.org, preview results and save them to Drafts. Ships with Cook Editor. Shows a read-only file system provider and `cooklang.api.saveDraft`. |
+| [`recipe-hub`](./recipe-hub) | Search recipes.cooklang.org, preview results and save them to Drafts. Install it from the Extensions view. Shows a read-only file system provider and `cooklang.api.saveDraft`. |
 
 ## How plugins work
 
@@ -33,6 +33,10 @@ At startup the app loads every plugin found in `editor/plugins/` — an unpacked
 - **Quick-pick UI** — `window.showQuickPick`
 
 ## Writing a new plugin
+
+For a step-by-step walkthrough, from an empty folder to a plugin published
+on plugins.cook.md, see the
+[plugin tutorial](https://cook.md/help/plugins/tutorial).
 
 1. Copy the `meal-journal` folder structure: `package.json` (manifest),
    `tsconfig.json`, `src/extension.ts` with an exported `activate()`.

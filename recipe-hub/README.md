@@ -2,8 +2,8 @@
 
 Search the public Cooklang recipe index at
 [recipes.cooklang.org](https://recipes.cooklang.org) without leaving Cook
-Editor, preview any result, and save it into your own recipes. Ships with
-Cook Editor, in the left sidebar.
+Editor, preview any result, and save it into your own recipes. Install it from
+the Extensions view in Cook Editor; it opens in the left sidebar.
 
 - The search box takes the full Recipe Hub query syntax: plain text
   (`pasta`), field queries (`tags:vegan`, `ingredients:garlic`, `title:soup`),
