@@ -1,5 +1,6 @@
 import * as assert from 'assert';
 import { CooklangApi, PluginReportResult } from './cooklang-api';
+import { LOCKED_TOOLTIP } from './locked';
 import { NutritionAggregate, nutritionTemplate } from './nutrition-template';
 import { FVL_CATEGORIES, NutriScoreBadgeProvider } from './provider';
 
@@ -22,7 +23,7 @@ const aggregate: NutritionAggregate = {
 const rendered = (agg: NutritionAggregate, categoryIngredients: string[]): PluginReportResult =>
     ({ ok: true, output: JSON.stringify({ aggregate: agg, categoryIngredients }) });
 
-function provider(options: { feature?: boolean; results?: PluginReportResult[] }): {
+function provider(options: { feature?: boolean; results?: PluginReportResult[]; showWhenLocked?: boolean }): {
     provider: NutriScoreBadgeProvider; calls: Array<{ command: string; arg: unknown }>; logs: string[];
 } {
     const calls: Array<{ command: string; arg: unknown }> = [];
@@ -35,7 +36,11 @@ function provider(options: { feature?: boolean; results?: PluginReportResult[] }
         }
         return results.shift();
     }, async () => []);
-    return { provider: new NutriScoreBadgeProvider(api, message => logs.push(message)), calls, logs };
+    return {
+        provider: new NutriScoreBadgeProvider(api, message => logs.push(message), () => options.showWhenLocked ?? true),
+        calls,
+        logs,
+    };
 }
 
 describe('NutriScoreBadgeProvider', () => {
@@ -63,10 +68,36 @@ describe('NutriScoreBadgeProvider', () => {
         assert.ok(badge?.tooltipMarkdown.includes('Fruit/veg/legumes: unknown (counted as 0 %)'));
     });
 
-    it('shows no badge without the nutrition feature, and does not render', async () => {
+    it('shows a locked badge without the nutrition feature, and does not render', async () => {
         const { provider: p, calls } = provider({ feature: false });
+        const badge = await p.provide(CONTEXT);
+        assert.strictEqual(badge?.grade, 'unknown');
+        assert.strictEqual(badge?.tooltipMarkdown, LOCKED_TOOLTIP);
+        assert.strictEqual(calls.length, 1);
+    });
+
+    it('shows no badge without the nutrition feature when showWhenLocked is off', async () => {
+        const { provider: p, calls } = provider({ feature: false, showWhenLocked: false });
         assert.strictEqual(await p.provide(CONTEXT), undefined);
         assert.strictEqual(calls.length, 1);
+    });
+
+    it('shows a locked badge, still logged once, when the service disagrees with the cached subscription', async () => {
+        for (const reason of ['unauthenticated', 'forbidden'] as const) {
+            const failure: PluginReportResult = { ok: false, reason, message: 'nope' };
+            const { provider: p, logs } = provider({ results: [failure, failure] });
+            const badge = await p.provide(CONTEXT);
+            assert.strictEqual(badge?.grade, 'unknown');
+            assert.strictEqual(badge?.tooltipMarkdown, LOCKED_TOOLTIP);
+            assert.ok(await p.provide(CONTEXT));
+            assert.deepStrictEqual(logs, [`Nutri-Score unavailable (${reason}): nope`]);
+        }
+    });
+
+    it('does not show a locked badge for unauthenticated/forbidden when showWhenLocked is off', async () => {
+        const failure: PluginReportResult = { ok: false, reason: 'forbidden', message: 'nope' };
+        const { provider: p } = provider({ results: [failure], showWhenLocked: false });
+        assert.strictEqual(await p.provide(CONTEXT), undefined);
     });
 
     it('shows no badge on failures and logs each reason once', async () => {

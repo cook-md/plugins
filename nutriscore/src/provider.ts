@@ -1,4 +1,5 @@
 import { CooklangApi, NutriScoreBadge, PluginReportResult, PreviewOutletContext } from './cooklang-api';
+import { LOCKED_TOOLTIP } from './locked';
 import { toPer100g } from './nutrition-input';
 import { nutritionTemplate, parseNutritionOutput } from './nutrition-template';
 import { nutriScore } from './nutriscore';
@@ -25,7 +26,11 @@ export class NutriScoreBadgeProvider {
      */
     protected categoriesSupported: boolean | undefined;
 
-    constructor(protected readonly api: CooklangApi, protected readonly log: (message: string) => void) { }
+    constructor(
+        protected readonly api: CooklangApi,
+        protected readonly log: (message: string) => void,
+        protected readonly showWhenLocked: () => boolean = () => true,
+    ) { }
 
     async provide(context: unknown): Promise<NutriScoreBadge | undefined> {
         if (!isPreviewContext(context)) {
@@ -34,7 +39,7 @@ export class NutriScoreBadgeProvider {
         // cook.md plan feature granting nutrition data (Cook Basic and Pro), the same
         // one the nutrition service itself enforces.
         if (!await this.api.hasFeature('nutrition_api')) {
-            return undefined;
+            return this.lockedBadge();
         }
         let categories: readonly string[] = this.categoriesSupported === false ? [] : FVL_CATEGORIES;
         let result = await this.render(context, categories);
@@ -47,6 +52,12 @@ export class NutriScoreBadgeProvider {
         }
         if (!result.ok) {
             this.logOnce(result.reason, result.message);
+            // The cached subscription said this recipe should get nutrition data, but the
+            // service disagreed (e.g. the plan lapsed or the sign-in expired): treat it the
+            // same as the feature being off rather than silently dropping the badge.
+            if (result.reason === 'unauthenticated' || result.reason === 'forbidden') {
+                return this.lockedBadge();
+            }
             return undefined;
         }
         const data = parseNutritionOutput(result.output, categories.length > 0);
@@ -70,6 +81,13 @@ export class NutriScoreBadgeProvider {
 
     protected render(context: PreviewOutletContext, categories: readonly string[]): Promise<PluginReportResult> {
         return this.api.renderReport({ uri: context.uri, template: nutritionTemplate(categories), scale: context.scale });
+    }
+
+    /** Greyed badge with an upgrade hint, or undefined if the user disabled it via `nutriscore.showWhenLocked`. */
+    protected lockedBadge(): NutriScoreBadge | undefined {
+        return this.showWhenLocked()
+            ? { kind: 'nutriscore', grade: 'unknown', tooltipMarkdown: LOCKED_TOOLTIP }
+            : undefined;
     }
 
     protected logOnce(reason: string, message: string): void {
