@@ -7,7 +7,7 @@ writing your own. Each plugin is a standalone npm package in its own folder.
 |---|---|
 | [`meal-journal`](./meal-journal) | Daily meal journal in Cooklang markup. **Start here** — it demonstrates the most common plugin APIs. |
 | [`shopping-list`](./shopping-list) | Aisle-grouped shopping lists with pantry subtraction. Ships with Cook Editor. Shows the Cooklang API and outlets. |
-| [`pantry`](./pantry) | See and edit `config/pantry.conf`: stock levels, low and out-of-stock items, expiry. Ships with Cook Editor. Shows editing a config file through the Cooklang API. |
+| [`pantry`](./pantry) | See and edit `config/pantry.conf`: stock levels, low and out-of-stock items, expiry. Install it from the Extensions view. Shows editing a config file through the Cooklang API. |
 | [`recipe-hub`](./recipe-hub) | Search recipes.cooklang.org, preview results and save them to Drafts. Install it from the Extensions view. Shows a read-only file system provider and `cooklang.api.saveDraft`. |
 
 ## How plugins work

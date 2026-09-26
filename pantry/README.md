@@ -1,7 +1,8 @@
 # Pantry
 
 See and edit what's in your [Cooklang](https://cooklang.org) pantry from Cook
-Editor's right sidebar. Ships with Cook Editor.
+Editor's right sidebar. Install it from the Extensions view (needs a Cook
+Editor with the pantry API; older versions ask you to update).
 
 - Items are grouped by the sections of `config/pantry.conf`, the same file
   CookCLI and the shopping list use; pantry items are subtracted from
