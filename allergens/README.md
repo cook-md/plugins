@@ -14,11 +14,15 @@ Open **Settings → Extensions → Allergens** and:
 | Badge | Meaning |
 |---|---|
 | red `⚠ Milk, Tree nuts +1` | at least one of your allergens was found |
-| amber `⚠ Check allergens` | nothing found, but some ingredients couldn't be checked |
-| no badge | every ingredient was checked and none of your allergens was found |
+| amber `⚠ Check allergens` | nothing found, but something couldn't be checked: ingredients the nutrition service doesn't know yet, linked recipes, or the service couldn't be reached |
+| no badge | none of your allergens were found in the ingredients that were checked, and nothing was left unchecked |
 | grey `🔒 Allergens` | you ticked standard allergens but your plan doesn't include nutrition data |
 
 Hover the badge to see which ingredients triggered each allergen and which ones couldn't be checked.
+
+Linked recipes (`@./Other recipe{}`) aren't looked into: they always show under "Couldn't check", so open the linked recipe to check it. Custom words still match the linked recipe's name.
+
+If the cook.md nutrition service can't be reached, the standard allergens aren't checked: the badge turns amber (or red, if a custom word matched) and the hover says so.
 
 **This is informational only.** It never says a recipe is allergen-free: ingredient data can be incomplete, and it knows nothing about cross-contamination. Always check product labels.
 
