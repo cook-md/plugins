@@ -21,7 +21,8 @@ export interface NutritionItem {
     micros: Record<string, number>;
     source: string;
     confidence: string;
-    warnings: unknown[];
+    /** May be missing entirely on older service versions; treat as no warnings. */
+    warnings?: unknown[];
 }
 
 export interface NutritionFailure {
@@ -49,6 +50,27 @@ export interface NutritionData {
     aggregate: NutritionAggregate;
     /** Grams of matched ingredients in any requested category; undefined when none were requested. */
     categoryMassG?: number;
+}
+
+const PLACEHOLDER_WARNING_CODE = 'nutrition_placeholder';
+
+/**
+ * True when the nutrition service could not resolve this ingredient: it returns it as a normal
+ * `items[]` entry with `mass_g: 0`, zero macros and `confidence: 'estimated'`, tagged with a
+ * `nutrition_placeholder` warning. Warnings are normally `{ code: string, ... }` objects, but a
+ * bare string warning is accepted defensively too. `warnings` may be missing entirely (treated as
+ * none, i.e. not a placeholder).
+ */
+export function isPlaceholder(item: NutritionItem): boolean {
+    if (!Array.isArray(item.warnings)) {
+        return false;
+    }
+    return item.warnings.some(warning => {
+        if (typeof warning === 'string') {
+            return warning === PLACEHOLDER_WARNING_CODE;
+        }
+        return isPlainObject(warning) && warning.code === PLACEHOLDER_WARNING_CODE;
+    });
 }
 
 const SLUG = /^[a-z0-9-]{1,40}$/;
