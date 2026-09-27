@@ -2,10 +2,18 @@ import * as assert from 'assert';
 import { escapeMarkdown, formatSource, summarizeTrust, tooltipMarkdown } from './trust';
 import { NutritionAggregate, NutritionItem } from './nutrition-template';
 
-const item = (ingredient: string, mass: number, confidence: string, source = 'usda'): NutritionItem => ({
+const item = (ingredient: string, mass: number, confidence: string, source = 'usda', warnings: unknown[] = []): NutritionItem => ({
     ingredient, preparation: '', amount: { value: 1, unit: 'g', mass_g: mass },
     macros: { kcal: 0, protein_g: 0, fat_g: 0, carb_g: 0, fiber_g: 0, sugar_g: 0, sat_fat_g: 0 },
-    micros: {}, source, confidence, warnings: [],
+    micros: {}, source, confidence, warnings,
+});
+
+/** A `nutrition_placeholder` item: unresolved ingredient, `mass_g: 0`, zero macros, `confidence: 'estimated'`. */
+const placeholder = (ingredient: string, warningForm: 'object' | 'string' = 'object'): NutritionItem => ({
+    ingredient, preparation: '', amount: { value: 0, unit: '', mass_g: 0 },
+    macros: { kcal: 0, protein_g: 0, fat_g: 0, carb_g: 0, fiber_g: 0, sugar_g: 0, sat_fat_g: 0 },
+    micros: {}, source: 'usda', confidence: 'estimated',
+    warnings: [warningForm === 'string' ? 'nutrition_placeholder' : { code: 'nutrition_placeholder', message: 'unresolved ingredient' }],
 });
 
 const aggregate = (items: NutritionItem[], failed: string[] = []): NutritionAggregate => ({
@@ -78,6 +86,63 @@ describe('summarizeTrust', () => {
         assert.deepStrictEqual(summary.estimated, []);
         assert.strictEqual(summary.partial, 0);
         assert.deepStrictEqual(summary.sources, [{ source: 'usda', count: 1 }, { source: 'unknown', count: 1 }]);
+    });
+
+    it('counts a nutrition_placeholder item (object-form warning) as unmatched, not matched', () => {
+        const summary = summarizeTrust(aggregate([
+            item('flour', 500, 'confirmed'), item('milk', 300, 'partial', 'off'), item('egg', 100, 'confirmed'),
+            placeholder('chicken breast or thigh'),
+        ]));
+        assert.strictEqual(summary.matched, 3);
+        assert.strictEqual(summary.total, 4);
+        assert.deepStrictEqual(summary.unmatched, ['chicken breast or thigh']);
+    });
+
+    it('lists real failures before placeholder items in unmatched', () => {
+        const summary = summarizeTrust(aggregate(
+            [item('flour', 500, 'confirmed'), placeholder('chana dal')],
+            ['pinch of magic'],
+        ));
+        assert.deepStrictEqual(summary.unmatched, ['pinch of magic', 'chana dal']);
+        assert.strictEqual(summary.matched, 1);
+        assert.strictEqual(summary.total, 3);
+    });
+
+    it('detects a bare string "nutrition_placeholder" warning too', () => {
+        const summary = summarizeTrust(aggregate([
+            item('flour', 500, 'confirmed'), item('milk', 300, 'confirmed'),
+            placeholder('chana dal', 'string'), placeholder('cooked white or brown rice', 'string'),
+        ]));
+        assert.strictEqual(summary.matched, 2);
+        assert.strictEqual(summary.total, 4);
+        assert.deepStrictEqual(summary.unmatched, ['chana dal', 'cooked white or brown rice']);
+        // 2 of 4 = 50 % -> below the 70 % gate.
+        assert.strictEqual(summary.reliable, false);
+    });
+
+    it('excludes placeholders from estimated, partial and sources even though they carry confidence "estimated"', () => {
+        const summary = summarizeTrust(aggregate([
+            item('flour', 500, 'confirmed'), placeholder('chana dal'),
+        ]));
+        assert.deepStrictEqual(summary.estimated, []);
+        assert.strictEqual(summary.partial, 0);
+        assert.deepStrictEqual(summary.sources, [{ source: 'usda', count: 1 }]);
+    });
+
+    it('does not affect items that have other warnings or no warnings at all', () => {
+        const withOtherWarning = item('milk', 300, 'confirmed', 'usda', [{ code: 'some_other_warning' }]);
+        const summary = summarizeTrust(aggregate([item('flour', 500, 'confirmed'), withOtherWarning]));
+        assert.strictEqual(summary.matched, 2);
+        assert.strictEqual(summary.total, 2);
+        assert.deepStrictEqual(summary.unmatched, []);
+    });
+
+    it('treats a missing warnings field as no warnings (not a placeholder)', () => {
+        const noWarningsField = { ...item('milk', 300, 'confirmed') } as { warnings?: unknown[] };
+        delete noWarningsField.warnings;
+        const summary = summarizeTrust(aggregate([item('flour', 500, 'confirmed'), noWarningsField as unknown as NutritionItem]));
+        assert.strictEqual(summary.matched, 2);
+        assert.strictEqual(summary.total, 2);
     });
 });
 

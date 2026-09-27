@@ -120,6 +120,40 @@ describe('NutriScoreBadgeProvider', () => {
         assert.strictEqual((await p.provide(CONTEXT))?.grade, 'unknown');
     });
 
+    it('returns an unknown grade when half the items are nutrition_placeholder entries', async () => {
+        // 2 real items + 2 placeholders -> matched 2 of 4 = 50 %, below the 70 % reliability gate.
+        const withPlaceholders: NutritionAggregate = {
+            ...aggregate,
+            items: [
+                ...aggregate.items,
+                {
+                    ingredient: 'milk', preparation: '', amount: { value: 100, unit: '', mass_g: 100 },
+                    macros: { kcal: 42, protein_g: 3.4, fat_g: 1, carb_g: 5, fiber_g: 0, sugar_g: 5, sat_fat_g: 0.6 },
+                    micros: {}, source: 'usda', confidence: 'confirmed', warnings: [],
+                },
+                {
+                    ingredient: 'chicken breast or thigh', preparation: '', amount: { value: 0, unit: '', mass_g: 0 },
+                    macros: { kcal: 0, protein_g: 0, fat_g: 0, carb_g: 0, fiber_g: 0, sugar_g: 0, sat_fat_g: 0 },
+                    micros: {}, source: 'usda', confidence: 'estimated',
+                    warnings: [{ code: 'nutrition_placeholder', message: 'unresolved ingredient' }],
+                },
+                {
+                    ingredient: 'chana dal', preparation: '', amount: { value: 0, unit: '', mass_g: 0 },
+                    macros: { kcal: 0, protein_g: 0, fat_g: 0, carb_g: 0, fiber_g: 0, sugar_g: 0, sat_fat_g: 0 },
+                    micros: {}, source: 'usda', confidence: 'estimated',
+                    warnings: ['nutrition_placeholder'],
+                },
+            ],
+        };
+        const { provider: p } = provider({ results: [rendered(withPlaceholders, ['apple'])] });
+        const badge = await p.provide(CONTEXT);
+        assert.strictEqual(badge?.grade, 'unknown');
+        assert.ok(badge?.tooltipMarkdown.includes('Matched: 2 of 4 ingredients'));
+        assert.ok(badge?.tooltipMarkdown.includes('Not matched:'));
+        assert.ok(badge?.tooltipMarkdown.includes('chicken breast or thigh'));
+        assert.ok(badge?.tooltipMarkdown.includes('chana dal'));
+    });
+
     it('ignores anything that is not a preview context', async () => {
         const { provider: p, calls } = provider({});
         assert.strictEqual(await p.provide({ uri: 3 }), undefined);

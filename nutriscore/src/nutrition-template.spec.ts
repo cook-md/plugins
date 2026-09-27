@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { nutritionTemplate, parseNutritionOutput } from './nutrition-template';
+import { NutritionItem, isPlaceholder, nutritionTemplate, parseNutritionOutput } from './nutrition-template';
 
 const macros = { kcal: 400, protein_g: 10, fat_g: 5, carb_g: 50, fiber_g: 6, sugar_g: 8, sat_fat_g: 2 };
 
@@ -81,5 +81,50 @@ describe('parseNutritionOutput', () => {
         assert.strictEqual(data?.aggregate.items.length, 2);
         assert.strictEqual(data?.aggregate.failures.length, 1);
         assert.strictEqual(data?.categoryMassG, 300);
+    });
+
+    it('keeps warnings on validated items, including a nutrition_placeholder one, and tolerates a missing warnings field', () => {
+        const withWarnings = {
+            ...aggregate,
+            items: [
+                {
+                    ingredient: 'chana dal', preparation: '', amount: { value: 0, unit: '', mass_g: 0 }, macros: {}, micros: {},
+                    source: 'usda', confidence: 'estimated', warnings: [{ code: 'nutrition_placeholder', message: 'unresolved' }],
+                },
+                // No `warnings` field at all -- must not be dropped or crash.
+                { ingredient: 'flour', preparation: '', amount: { value: 200, unit: 'g', mass_g: 200 }, macros: {}, micros: {}, source: 'usda', confidence: 'confirmed' },
+            ],
+        };
+        const data = parseNutritionOutput(JSON.stringify({ aggregate: withWarnings, categoryIngredients: [] }), false);
+        assert.strictEqual(data?.aggregate.items.length, 2);
+        assert.deepStrictEqual(data?.aggregate.items[0].warnings, [{ code: 'nutrition_placeholder', message: 'unresolved' }]);
+        assert.strictEqual(data?.aggregate.items[1].warnings, undefined);
+    });
+});
+
+describe('isPlaceholder', () => {
+    const base = {
+        ingredient: 'x', preparation: '', amount: { value: 0, unit: '', mass_g: 0 },
+        macros: {}, micros: {}, source: 'usda', confidence: 'estimated',
+    };
+
+    it('detects a warning object with code "nutrition_placeholder"', () => {
+        const item = { ...base, warnings: [{ code: 'nutrition_placeholder', message: 'unresolved' }] } as unknown as NutritionItem;
+        assert.strictEqual(isPlaceholder(item), true);
+    });
+
+    it('detects a bare string "nutrition_placeholder" warning', () => {
+        const item = { ...base, warnings: ['nutrition_placeholder'] } as unknown as NutritionItem;
+        assert.strictEqual(isPlaceholder(item), true);
+    });
+
+    it('is false for an unrelated warning code, an empty warnings array, or a missing warnings field', () => {
+        assert.strictEqual(isPlaceholder({ ...base, warnings: [{ code: 'some_other_warning' }] } as unknown as NutritionItem), false);
+        assert.strictEqual(isPlaceholder({ ...base, warnings: [] } as unknown as NutritionItem), false);
+        assert.strictEqual(isPlaceholder({ ...base } as unknown as NutritionItem), false);
+    });
+
+    it('is false when warnings is not an array', () => {
+        assert.strictEqual(isPlaceholder({ ...base, warnings: 'nutrition_placeholder' } as unknown as NutritionItem), false);
     });
 });

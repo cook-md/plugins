@@ -1,4 +1,4 @@
-import { NutritionAggregate } from './nutrition-template';
+import { NutritionAggregate, isPlaceholder } from './nutrition-template';
 import { NutriScoreResult } from './nutriscore';
 
 export type ConfidenceLevel = 'High' | 'Medium' | 'Low';
@@ -64,29 +64,35 @@ function formatList(entries: string[]): string {
 }
 
 export function summarizeTrust(aggregate: NutritionAggregate): TrustSummary {
+    // `nutrition_placeholder` items are the service's way of returning an unresolved ingredient
+    // (mass_g: 0, zero macros, confidence: 'estimated') instead of a failure. Treat them like
+    // `failures[]`: not matched, and excluded from the estimated/partial/sources/confidence-weighting
+    // breakdowns of the ingredients that *did* match.
     const items = aggregate.items;
-    const mass = items.reduce((sum, item) => sum + item.amount.mass_g, 0);
+    const matchedItems = items.filter(item => !isPlaceholder(item));
+    const placeholderItems = items.filter(isPlaceholder);
+    const mass = matchedItems.reduce((sum, item) => sum + item.amount.mass_g, 0);
     const weighted = mass > 0
-        ? items.reduce((sum, item) => sum + item.amount.mass_g * (CONFIDENCE_WEIGHT[item.confidence] ?? 0.3), 0) / mass
+        ? matchedItems.reduce((sum, item) => sum + item.amount.mass_g * (CONFIDENCE_WEIGHT[item.confidence] ?? 0.3), 0) / mass
         : 0;
     const level: ConfidenceLevel = weighted >= 0.8 ? 'High' : weighted >= 0.5 ? 'Medium' : 'Low';
     const sources = new Map<string, number>();
-    for (const item of items) {
+    for (const item of matchedItems) {
         const key = sourceKey(item.source);
         sources.set(key, (sources.get(key) ?? 0) + 1);
     }
     // The validator only guarantees `ingredient` and `amount.mass_g`; only the arrays it produced are
     // trustworthy for counts, never `totals.included_count`/`failed_count`, which are passed through
     // verbatim from the service and may diverge from what the validator kept.
-    const matched = items.length;
-    const total = matched + aggregate.failures.length;
+    const matched = matchedItems.length;
+    const total = matched + placeholderItems.length + aggregate.failures.length;
     return {
         level,
         matched,
         total,
-        unmatched: aggregate.failures.map(failure => failure.ingredient),
-        estimated: items.filter(item => item.confidence === 'estimated').map(item => item.ingredient),
-        partial: items.filter(item => item.confidence === 'partial').length,
+        unmatched: [...aggregate.failures.map(failure => failure.ingredient), ...placeholderItems.map(item => item.ingredient)],
+        estimated: matchedItems.filter(item => item.confidence === 'estimated').map(item => item.ingredient),
+        partial: matchedItems.filter(item => item.confidence === 'partial').length,
         sources: [...sources].map(([source, count]) => ({ source, count })),
         reliable: total > 0 && matched / total >= MIN_MATCHED_SHARE,
         weighed: aggregate.totals.mass_g > 0,

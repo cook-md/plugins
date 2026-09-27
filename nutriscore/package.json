@@ -2,7 +2,7 @@
   "name": "nutriscore",
   "displayName": "Nutri-Score",
   "description": "Nutri-Score badge on recipe previews, computed from the cook.md nutrition service, with a hover card showing how reliable it is. Needs a Basic or Pro plan.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cooklang",
   "license": "MIT",
   "repository": { "type": "git", "url": "https://github.com/cook-md/plugins.git", "directory": "nutriscore" },
