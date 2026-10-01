@@ -98,6 +98,6 @@
     "esbuild": "^0.28.2",
     "mocha": "^10.4.0",
     "ovsx": "^1.0.0",
-    "typescript": "~5.4.5"
+    "typescript": "~7.0.2"
   }
 }
