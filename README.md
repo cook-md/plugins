@@ -1,6 +1,6 @@
 # Cook Editor Plugins
 
-First-party plugins for [Cook Editor](https://cook.md), and a reference for
+First-party plugins for [Cook Editor](https://cook.md/editor), and a reference for
 writing your own. Each plugin is a standalone npm package in its own folder.
 
 | Plugin | Description |
