@@ -39,4 +39,11 @@ describe('buildCheckSpec', () => {
         assert.deepStrictEqual(spec.checks[8], { key: 'vit_c_mg', label: 'Vitamin C', kind: 'min', unit: 'mg' });
         assert.strictEqual(spec.servings, 1);
     });
+
+    it('embeds as plain JSON and does not share the AMDR arrays', () => {
+        const spec = buildCheckSpec(DEFAULTS, 2);
+        assert.deepStrictEqual(JSON.parse(JSON.stringify(spec)), spec);
+        (spec.checks[1].band as unknown as number[])[0] = 99;
+        assert.deepStrictEqual(buildCheckSpec(DEFAULTS, 2).checks[1].band, [10, 35]);
+    });
 });

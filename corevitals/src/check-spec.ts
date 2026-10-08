@@ -1,6 +1,7 @@
 import { labelFor, unitFor } from './nutrient-labels';
 import { CoreVitalsSettings, Standard } from './settings';
 
+/** energy: within ± tol of the target; macroPercent: share of energy inside a band; min: at least; max: at most. */
 export type CheckKind = 'energy' | 'macroPercent' | 'min' | 'max';
 
 /** One check the template evaluates. Plain JSON: it is embedded in the template. */
@@ -17,6 +18,7 @@ export interface Check {
     factor?: number;
 }
 
+/** Everything the template needs to evaluate a plan or recipe; embedded verbatim as a Jinja dict literal, so it must stay plain JSON. */
 export interface CheckSpec {
     standard: Standard;
     tol: number;
@@ -42,11 +44,12 @@ function macroCheck(key: MacroKey, override: number): Check {
     if (override > 0) {
         check.target = override;
     } else {
-        check.band = AMDR[key];
+        check.band = [AMDR[key][0], AMDR[key][1]];
     }
     return check;
 }
 
+/** Builds the checks for already-normalised settings; `servings` (recipes only) is clamped to at least 1. */
 export function buildCheckSpec(settings: CoreVitalsSettings, servings: number): CheckSpec {
     const energy: Check = { key: 'kcal', label: labelFor('kcal'), kind: 'energy', unit: 'kcal' };
     if (settings.energyKcal > 0) {

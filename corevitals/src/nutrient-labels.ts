@@ -35,6 +35,7 @@ const LABELS: Readonly<Record<string, string>> = {
 
 const UNIT_SUFFIX = /_(g|mg|ug|iu)$/;
 
+/** Display label for an already-normalised (lower-case) nutrient key. */
 export function labelFor(key: string): string {
     return LABELS[key] ?? prettify(key);
 }
@@ -52,6 +53,7 @@ export function prettify(key: string): string {
     return [first.charAt(0).toUpperCase() + first.slice(1), ...rest].join(' ');
 }
 
+/** Unit from the key suffix (`_g`, `_mg`, `_ug`, `_iu`) or `kcal`; empty when unknown. */
 export function unitFor(key: string): string {
     if (key === 'kcal') {
         return 'kcal';
