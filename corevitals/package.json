@@ -1,0 +1,138 @@
+{
+  "name": "corevitals",
+  "displayName": "Core Vitals",
+  "description": "Checks a meal plan or recipe against daily nutrient targets: a Vitals badge on previews and a full report with charts. Needs a Basic or Pro plan.",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/cook-md/plugins.git", "directory": "corevitals" },
+  "keywords": ["cooklang", "nutrition", "meal plan", "macros", "micronutrients", "recipes"],
+  "engines": { "vscode": "^1.100.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "cooklang.corevitals.provideBadge", "title": "Core Vitals", "category": "Core Vitals" },
+      {
+        "command": "cooklang.corevitals.openReport",
+        "title": "Core Vitals Report",
+        "category": "Core Vitals",
+        "icon": { "light": "media/vitals-light.svg", "dark": "media/vitals-dark.svg" }
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "cooklang.corevitals.provideBadge", "when": "false" },
+        { "command": "cooklang.corevitals.openReport", "when": "resourceExtname =~ /^\\.(cook|menu)$/i" }
+      ],
+      "cooklang/recipePreview/badge": [
+        { "command": "cooklang.corevitals.provideBadge" }
+      ],
+      "cooklang/menuPreview/badge": [
+        { "command": "cooklang.corevitals.provideBadge" }
+      ],
+      "cooklang/recipePreview/toolbar": [
+        { "command": "cooklang.corevitals.openReport", "group": "navigation@20" }
+      ],
+      "cooklang/menuPreview/toolbar": [
+        { "command": "cooklang.corevitals.openReport", "group": "navigation@20" }
+      ],
+      "editor/title": [
+        { "command": "cooklang.corevitals.openReport", "when": "resourceExtname =~ /^\\.(cook|menu)$/i", "group": "navigation@20" }
+      ]
+    },
+    "configuration": {
+      "title": "Core Vitals",
+      "properties": {
+        "coreVitals.standard": {
+          "type": "string",
+          "enum": ["fda", "eu", "uk"],
+          "enumDescriptions": ["US FDA daily values", "EU reference intakes", "UK reference intakes"],
+          "default": "fda",
+          "order": 1,
+          "description": "Daily-value table the targets come from."
+        },
+        "coreVitals.energyKcal": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 10000,
+          "order": 2,
+          "description": "Daily energy target in kcal. 0 uses the standard's value (2000 kcal for FDA)."
+        },
+        "coreVitals.proteinPercent": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 100,
+          "order": 3,
+          "description": "Protein as % of energy. 0 (or anything below 1) uses the 10–35 % range."
+        },
+        "coreVitals.carbPercent": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 100,
+          "order": 4,
+          "description": "Carbohydrate as % of energy. 0 (or anything below 1) uses the 45–65 % range."
+        },
+        "coreVitals.fatPercent": {
+          "type": "number",
+          "default": 0,
+          "minimum": 0,
+          "maximum": 100,
+          "order": 5,
+          "description": "Fat as % of energy. 0 (or anything below 1) uses the 20–35 % range. If the set percentages add up to more than 100, all three fall back to the ranges."
+        },
+        "coreVitals.micronutrients": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["calcium_mg", "iron_mg", "potassium_mg", "magnesium_mg", "zinc_mg", "vit_a_rae_ug", "vit_c_mg", "vit_d_ug", "vit_b12_ug", "folate_ug"],
+          "order": 6,
+          "description": "Nutrient keys checked against their daily value (e.g. iron_mg, vit_c_mg, selenium_ug). Energy, macros, fiber, saturated fat and sodium are always checked."
+        },
+        "coreVitals.tolerancePercent": {
+          "type": "number",
+          "default": 20,
+          "minimum": 0,
+          "maximum": 100,
+          "order": 7,
+          "description": "How far from a target still counts as met: minimums pass at 100 − tolerance %, limits at 100 + tolerance %, energy within ± tolerance %."
+        },
+        "coreVitals.mealsPerDay": {
+          "type": "integer",
+          "default": 3,
+          "minimum": 1,
+          "maximum": 10,
+          "order": 8,
+          "description": "A recipe serving is judged against one meal, i.e. a day's targets divided by this."
+        },
+        "coreVitals.showWhenLocked": {
+          "type": "boolean",
+          "default": true,
+          "order": 9,
+          "description": "Show a greyed Vitals badge with an upgrade hint when your plan doesn't include nutrition data."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath corevitals-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^22.20.4",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^4.0.0",
+    "mocha": "^12.0.2",
+    "ovsx": "^1.0.0",
+    "typescript": "~7.0.2"
+  }
+}
