@@ -42,6 +42,7 @@ describe('buildTemplate', () => {
         assert.ok(template.includes('row.label | escape'));
         assert.ok(template.includes('name | escape'));
         assert.ok(template.includes('d.label | string)[:10] | escape'));
+        assert.ok(template.includes('<td>{{ d.label | escape }}</td>'));
         assert.ok(!template.includes('{{ row.label }}'));
         assert.ok(!template.includes('{{ name }}'));
     });

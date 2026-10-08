@@ -19,4 +19,20 @@ describe('parseServings', () => {
         assert.strictEqual(parseServings('---\ntitle: x\n---\nservings: 4\n'), undefined);
         assert.strictEqual(parseServings('intro\n---\nservings: 4\n---\n'), undefined);
     });
+
+    it('accepts the serves and yield aliases and a quoted number', () => {
+        assert.strictEqual(parseServings('---\nserves: 4\n---\n'), 4);
+        assert.strictEqual(parseServings('---\nyield: 6 portions\n---\n'), 6);
+        assert.strictEqual(parseServings('---\nservings: "4"\n---\n'), 4);
+        assert.strictEqual(parseServings('---\nservings: \'2\'\n---\n'), 2);
+    });
+
+    it('needs a closed frontmatter block', () => {
+        assert.strictEqual(parseServings('---\ntitle: x\nservings: 4\n'), undefined);
+    });
+
+    it('treats values above the bound as unknown', () => {
+        assert.strictEqual(parseServings('---\nservings: 99999\n---\n'), undefined);
+        assert.strictEqual(parseServings('---\nservings: 1000\n---\n'), 1000);
+    });
 });

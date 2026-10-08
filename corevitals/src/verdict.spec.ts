@@ -10,6 +10,8 @@ function output(overrides: Partial<VitalsOutput>): VitalsOutput {
     return { kind: 'plan', days: 2, people: 2, standard: 'fda', tol: 20, rows: [], matched: 18, total: 20, unmatched: ['saffron'], missingRecipes: [], confidence: 'partial', ...overrides };
 }
 
+const CONTEXT = { mealsPerDay: 3, servingsKnown: true };
+
 describe('evaluate', () => {
     it('counts met checks and sorts shortfalls into below and over', () => {
         const verdict = evaluate(output({
@@ -19,10 +21,11 @@ describe('evaluate', () => {
                 row({ key: 'fat_g', label: 'Fat', kind: 'macroPercent', actual: 40, lo: 20, hi: 35, percent: 40, ok: false }),
                 row({ key: 'sodium_mg', label: 'Sodium', kind: 'max', percent: 132, ok: false }),
                 row({ percent: 54, ok: false }),
+                // Synthetic: an energy row over target.
                 row({ key: 'kcal2', label: 'Energy high', kind: 'energy', percent: 130, ok: false }),
                 row({ key: 'boron_ug', label: 'Boron', skipped: true }),
             ],
-        }));
+        }), CONTEXT);
         assert.strictEqual(verdict.withheld, undefined);
         assert.strictEqual(verdict.met, 1);
         assert.strictEqual(verdict.counted, 6);
@@ -33,25 +36,32 @@ describe('evaluate', () => {
     });
 
     it('withholds the verdict when fewer than 70 % of ingredients matched, at the edge', () => {
-        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], matched: 7, total: 10 })).withheld, undefined);
-        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], matched: 6, total: 10 })).withheld, 'unmatched');
+        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], matched: 7, total: 10 }), CONTEXT).withheld, undefined);
+        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], matched: 6, total: 10 }), CONTEXT).withheld, 'unmatched');
     });
 
     it('withholds for missing recipes, no data and no counted checks', () => {
-        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], missingRecipes: ['Pesto'] })).withheld, 'missingRecipes');
-        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], matched: 0, total: 0 })).withheld, 'noData');
-        assert.strictEqual(evaluate(output({ rows: [row({ skipped: true })] })).withheld, 'noChecks');
+        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], missingRecipes: ['Pesto'] }), CONTEXT).withheld, 'missingRecipes');
+        assert.strictEqual(evaluate(output({ rows: [row({ ok: true })], matched: 0, total: 0 }), CONTEXT).withheld, 'noData');
+        assert.strictEqual(evaluate(output({ rows: [row({ skipped: true })] }), CONTEXT).withheld, 'noChecks');
     });
 
     it('maps the service confidence to High / Medium / Low', () => {
-        assert.strictEqual(evaluate(output({ confidence: 'confirmed' })).confidence, 'High');
-        assert.strictEqual(evaluate(output({ confidence: 'partial' })).confidence, 'Medium');
-        assert.strictEqual(evaluate(output({ confidence: 'estimated' })).confidence, 'Low');
-        assert.strictEqual(evaluate(output({ confidence: '' })).confidence, 'Low');
+        assert.strictEqual(evaluate(output({ confidence: 'confirmed' }), CONTEXT).confidence, 'High');
+        assert.strictEqual(evaluate(output({ confidence: 'partial' }), CONTEXT).confidence, 'Medium');
+        assert.strictEqual(evaluate(output({ confidence: 'estimated' }), CONTEXT).confidence, 'Low');
+        assert.strictEqual(evaluate(output({ confidence: '' }), CONTEXT).confidence, 'Low');
     });
 
     it('carries the period through', () => {
-        const verdict = evaluate(output({ kind: 'recipe', days: 1, people: 4, standard: 'eu' }));
+        const verdict = evaluate(output({ kind: 'recipe', days: 1, people: 4, standard: 'eu' }), CONTEXT);
         assert.deepStrictEqual({ kind: verdict.kind, days: verdict.days, people: verdict.people, standard: verdict.standard }, { kind: 'recipe', days: 1, people: 4, standard: 'eu' });
+        const recipe = evaluate(output({ kind: 'recipe' }), { mealsPerDay: 4, servingsKnown: false });
+        assert.deepStrictEqual({ mealsPerDay: recipe.mealsPerDay, servingsKnown: recipe.servingsKnown }, { mealsPerDay: 4, servingsKnown: false });
+    });
+
+    it('prefers noData over missingRecipes and missingRecipes over unmatched', () => {
+        assert.strictEqual(evaluate(output({ matched: 0, total: 0, missingRecipes: ['x'] }), CONTEXT).withheld, 'noData');
+        assert.strictEqual(evaluate(output({ matched: 1, total: 10, missingRecipes: ['x'] }), CONTEXT).withheld, 'missingRecipes');
     });
 });
