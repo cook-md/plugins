@@ -32,10 +32,10 @@ Contributed under `coreVitals.*` (Settings → Extensions → Core Vitals):
 | `coreVitals.fatPercent` | number | `0` | Fat as % of energy; `0` uses the AMDR band 20–35 |
 | `coreVitals.micronutrients` | string[] | `calcium_mg, iron_mg, potassium_mg, magnesium_mg, zinc_mg, vit_a_rae_ug, vit_c_mg, vit_d_ug, vit_b12_ug, folate_ug` | Nutrient keys checked as minimums |
 | `coreVitals.tolerancePercent` | number | `20` | Band width around a target (see Checks) |
-| `coreVitals.mealsPerDay` | number | `3` | A recipe serving is judged against a day ÷ this |
+| `coreVitals.mealsPerDay` | integer | `3` | A recipe serving is judged against a day ÷ this |
 | `coreVitals.showWhenLocked` | boolean | `true` | Show the greyed locked badge without a plan |
 
-Normalisation (one module, unit-tested): numbers that are not finite or are negative fall back to the default; percent overrides outside 1–100 fall back to `0`; `tolerancePercent` is clamped to 0–100; `mealsPerDay` to 1–10; micronutrient keys are trimmed and lower-cased, must match `^[a-z0-9_]{1,40}$`, duplicates and the always-checked keys (`kcal`, `protein_g`, `carb_g`, `fat_g`, `fiber_g`, `sat_fat_g`, `sodium_mg`) are dropped; at most 30 keys. A key with no daily value in the chosen standard is kept in the list but skipped from the count and listed in the report under "No daily value".
+Normalisation (one module, unit-tested): numbers that are not finite or are negative fall back to the default; percent overrides outside 1–100 fall back to `0`; when the set macro overrides add up to more than 100 all three are dropped (the AMDR bands apply), with no further feasibility check; `tolerancePercent` is clamped to 0–100; `mealsPerDay` to 1–10; micronutrient keys are trimmed and lower-cased, must match `^[a-z0-9_]{1,40}$`, duplicates and the always-checked keys (`kcal`, `protein_g`, `carb_g`, `fat_g`, `fiber_g`, `sat_fat_g`, `sodium_mg`) are dropped; at most 30 keys. A key with no daily value in the chosen standard is kept in the list but skipped from the count and listed in the report under "No daily value".
 
 On any `coreVitals.*` change the plugin calls `cooklang.api.refreshBadges`. Settings are embedded in the template (see below), so the editor's render cache misses on its own.
 
