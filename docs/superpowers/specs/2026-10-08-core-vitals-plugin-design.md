@@ -70,7 +70,7 @@ Labels for the macros, fiber, saturated fat, sodium and the default micros are a
 
 `percent` is `actual / target × 100`, rounded to the nearest integer for display. A check whose daily value is undefined (`reference_intake` returns undefined, or `kcal` is undefined for the standard and no override is set) is reported with `skipped: true` and excluded from the counts.
 
-**Reliability.** From the aggregate totals: `matched = included_count − placeholders`, `total = included_count + failed_count`, where placeholders are items carrying a `nutrition_placeholder` warning (same rule as Nutri-Score). The verdict is withheld — `Vitals ?` — when `total` is 0, when `matched / total < 0.7`, or when `plan.missing_recipes` is non-empty. Confidence label (High / Medium / Low) reuses Nutri-Score's mass-weighted rule.
+**Reliability.** From the aggregate totals: `matched = included_count − placeholders`, `total = included_count + failed_count`, where placeholders are items carrying a `nutrition_placeholder` warning (same rule as Nutri-Score). The verdict is withheld — `Vitals ?` — when `total` is 0, when `matched / total < 0.7`, or when `plan.missing_recipes` is non-empty. Confidence label: the service's `confidence_weighted` mapped to High (`confirmed`), Medium (`partial`) or Low (anything else).
 
 **Servings for recipes.** The plugin reads the document text (`workspace.openTextDocument(uri)`), takes the YAML frontmatter block between the opening `---` lines, and parses the leading integer of `servings:` (`servings: 4`, `servings: 4 people`). Missing or non-numeric → 1 and the hover says "whole recipe (no servings in frontmatter)". The number is passed into the template as part of the spec.
 
@@ -100,7 +100,7 @@ Per-day rows (plans only) come from `macros(day.ingredients)` for each `plan.day
 
 ### JSON output validation (plugin side)
 
-Rejects (→ `Vitals ?`, logged once as `output`) unless: `rows` is an array whose entries have string `key`/`label`, finite `percent` (or `skipped: true`), boolean `ok`; `matched`/`total` finite non-negative integers; `unmatched` an array of strings; `missingRecipes` an array of `{ name }`. Extra fields are ignored. Names are capped at 60 chars and markdown-escaped before display (Nutri-Score's helpers, copied).
+Rejects (→ `Vitals ?`, logged once as `output`) unless: `rows` is an array whose entries have string `key`/`label`/`unit`, a known `kind`, finite `actual`/`target`/`lo`/`hi`/`percent` (zeroed when `skipped: true`), boolean `ok` and `skipped`; `days`/`people`/`tol` finite; `matched`/`total` non-negative integers; `unmatched` and `missingRecipes` arrays of strings (other entries dropped). Extra fields are ignored. Names are capped at 60 chars and markdown-escaped before display (Nutri-Score's helpers, copied).
 
 ## Badge
 
@@ -177,6 +177,7 @@ Mirrors `nutriscore/`: `package.json`, `LICENSE`, `README.md`, `scripts/deploy.j
 
 - `cooklang-api.ts` — typed wrapper (copied; adds `openReport`, `refreshBadges`).
 - `support-check.ts` — copied.
+- `markdown.ts` — copied from allergens (escape, truncate, list formatting).
 - `settings.ts` — read + normalise `coreVitals.*`.
 - `nutrient-labels.ts` — label table and key prettifier.
 - `check-spec.ts` — settings → check spec.
@@ -194,7 +195,7 @@ Root README gets a table row. Marketplace publishing as for the others.
 ## Testing
 
 - Unit (mocha, no `vscode`): settings normalisation for every clamp and the key filter; label table and prettifier; check spec for defaults, overrides and standard; template text (mode line, embedded spec, no unescaped user text inside the Jinja source — keys are validated by regex before embedding); JSON output validation incl. malformed rows; verdict thresholds at the 0.9 / 0.6 edges, the 70 % reliability edge, missing recipes, zero counted; pill text for 1–3 digit counts; hover escaping, caps, every variant; servings parser (`4`, `4 people`, missing, frontmatter absent, `servings` outside the frontmatter ignored).
-- Fixture: a captured `json`-mode output for the two-day fixture plan run through validation → verdict → badge + hover.
+- Provider spec: a representative `json`-mode payload run through validation → verdict → badge + hover, plus every render-failure path.
 - Editor specs: `PreviewBadgeController` (debounce, stale-while-hidden, sequence guard, hover flag), menu preview renders badges from the new outlet, `openReport` argument validation and that it calls the presenter with the expected options.
 - E2E in the Electron app (CDP): open `week.menu` from the cooklang-reports-nutrition fixtures with the recipes beside it; the menu preview shows a `Vitals n/m` pill; the toolbar icon opens a "Core Vitals" tab whose HTML contains the nutrient table and the per-day chart; changing `coreVitals.standard` updates the pill without editing the menu; a recipe preview shows the per-serving pill.
 
