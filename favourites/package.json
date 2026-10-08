@@ -2,28 +2,49 @@
   "name": "favourites",
   "displayName": "Favourites",
   "description": "Heart on recipe previews and a Favourites view, stored in a plain-text .bookmarks file. Ships with Cook Editor.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cooklang",
   "license": "MIT",
-  "repository": { "type": "git", "url": "https://github.com/cook-md/plugins.git", "directory": "favourites" },
-  "keywords": ["cooklang", "favourites", "bookmarks", "recipes"],
-  "engines": { "vscode": "^1.100.0" },
-  "categories": ["Other"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cook-md/plugins.git",
+    "directory": "favourites"
+  },
+  "keywords": [
+    "cooklang",
+    "favourites",
+    "bookmarks",
+    "recipes"
+  ],
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
   "main": "./out/extension.js",
-  "activationEvents": ["onStartupFinished"],
+  "activationEvents": [
+    "onStartupFinished"
+  ],
   "contributes": {
     "commands": [
       {
         "command": "cooklang.favourites.add",
         "title": "Add to Favourites",
         "category": "Favourites",
-        "icon": { "light": "media/heart-light.svg", "dark": "media/heart-dark.svg" }
+        "icon": {
+          "light": "media/heart-light.svg",
+          "dark": "media/heart-dark.svg"
+        }
       },
       {
         "command": "cooklang.favourites.remove",
         "title": "Remove from Favourites",
         "category": "Favourites",
-        "icon": { "light": "media/heart-filled.svg", "dark": "media/heart-filled.svg" }
+        "icon": {
+          "light": "media/heart-filled.svg",
+          "dark": "media/heart-filled.svg"
+        }
       },
       {
         "command": "cooklang.favourites.toggle",
@@ -38,9 +59,18 @@
     ],
     "menus": {
       "commandPalette": [
-        { "command": "cooklang.favourites.add", "when": "editorLangId == cooklang" },
-        { "command": "cooklang.favourites.remove", "when": "editorLangId == cooklang" },
-        { "command": "cooklang.favourites.openRecipe", "when": "false" }
+        {
+          "command": "cooklang.favourites.add",
+          "when": "editorLangId == cooklang"
+        },
+        {
+          "command": "cooklang.favourites.remove",
+          "when": "editorLangId == cooklang"
+        },
+        {
+          "command": "cooklang.favourites.openRecipe",
+          "when": "false"
+        }
       ],
       "cooklang/recipePreview/toolbar": [
         {
@@ -76,7 +106,11 @@
     },
     "views": {
       "explorer": [
-        { "id": "cooklang.favourites.view", "name": "Favourites", "visibility": "collapsed" }
+        {
+          "id": "cooklang.favourites.view",
+          "name": "Favourites",
+          "visibility": "collapsed"
+        }
       ]
     },
     "viewsWelcome": [

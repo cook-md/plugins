@@ -77,8 +77,11 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         await store.setFile(bookmarksFile(folder.uri));
     };
     context.subscriptions.push({ dispose: () => watcher?.dispose() });
+    // A new root with the same relative paths fires no store change, so re-sync the URIs explicitly.
     context.subscriptions.push(vscode.workspace.onDidChangeWorkspaceFolders(() => {
-        bindWorkspace().catch(reportError('Could not bind the workspace'));
+        bindWorkspace()
+            .then(() => syncContext(store, root(), api))
+            .catch(reportError('Could not bind the workspace'));
     }));
 
     const showToast = async (added: boolean, path: string): Promise<void> => {
@@ -136,8 +139,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     }
     context.subscriptions.push(vscode.commands.registerCommand(OPEN_RECIPE_COMMAND, async (argument: unknown) => {
         const target = recipeTarget(argument, root(), undefined);
-        if (target) {
+        if (!target) {
+            return;
+        }
+        try {
             await api.openPreview(target.uri);
+        } catch (error) {
+            // A hand-edited .bookmarks line can name something the preview cannot open (e.g. a menu).
+            const message = error instanceof Error ? error.message : String(error);
+            reportError('Could not open a favourite')(error);
+            vscode.window.showErrorMessage(`Could not open ${target.path}: ${message}`);
         }
     }));
 
