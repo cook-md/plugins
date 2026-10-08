@@ -205,3 +205,7 @@ Root README gets a table row. Marketplace publishing as for the others.
 - Daily values are generic adult figures. The report footer says so.
 - Ingredient matching coverage is the nutrition service's (cook-md/db#54); plans with many niche ingredients will often get `Vitals ?` until coverage grows.
 - Macro-share checks ignore alcohol (no `alcohol_g` from the service today).
+- A report tab keeps the targets it was opened with: re-clicking the toolbar icon refreshes it with the current settings (the badge refreshes on its own).
+- Cook Editor currently opens `.menu` files with the XML language (the bundled `vscode.xml` plugin claims the extension), so menu edits do not refresh an open report or the badge until the editor fixes the association. Workaround: `"files.associations": { "*.menu": "cooklang" }`. Tracked on the editor side (noted on cook-md/editor#204).
+- The template's `mode` line is informational: each built template carries only its own output branch, chosen in TypeScript. A `.menu` whose output reports the wrong kind (no `plan` context) gives `Vitals ?` rather than a per-serving verdict.
+- Macros above their band and energy above target are listed under "Over limit" in the hover.
