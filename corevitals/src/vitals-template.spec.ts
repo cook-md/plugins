@@ -50,6 +50,8 @@ describe('buildTemplate', () => {
         assert.ok(template.includes('name | escape'));
         assert.ok(template.includes('d.label | string)[:10] | escape'));
         assert.ok(template.includes('<td>{{ d.label | escape }}</td>'));
+        assert.ok(template.includes('confidence_weighted | default("unknown") | escape'));
+        assert.ok(template.includes('plan.servings is number'));
         assert.ok(!template.includes('{{ row.label }}'));
         assert.ok(!template.includes('{{ name }}'));
     });

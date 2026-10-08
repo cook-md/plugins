@@ -11,17 +11,19 @@ export const MAX_SERVINGS = 1000;
  * recipe body.
  */
 export function parseServings(text: string): number | undefined {
-    const lines = text.split(/\r?\n/);
+    const lines = text.replace(/^\uFEFF/, '').split(/\r?\n/);
     if (lines[0]?.trim() !== '---') {
         return undefined;
     }
     let servings: number | undefined;
+    let matched = false;
     for (const line of lines.slice(1)) {
         if (line.trim() === '---') {
             return servings;
         }
         const match = /^(servings|serves|yield)\s*:\s*["']?(\d+)/i.exec(line);
-        if (match && servings === undefined) {
+        if (match && !matched) {
+            matched = true;
             const value = Number.parseInt(match[2], 10);
             servings = value >= 1 && value <= MAX_SERVINGS ? value : undefined;
         }

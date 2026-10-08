@@ -45,39 +45,48 @@ export class CoreVitalsBadgeProvider {
         if (!await this.api.hasFeature('nutrition_api')) {
             return lockedBadge(settings.showWhenLocked);
         }
-        const isMenu = isMenuUri(context.uri);
-        let parsedServings: number | undefined;
-        if (!isMenu) {
-            const text = await this.readText(context.uri);
-            if (text === undefined) {
-                this.logOnce('read', 'could not read the recipe text; assuming one serving');
+        try {
+            const isMenu = isMenuUri(context.uri);
+            let parsedServings: number | undefined;
+            if (!isMenu) {
+                const text = await this.readText(context.uri);
+                if (text === undefined) {
+                    this.logOnce('read', 'could not read the recipe text; assuming one serving');
+                }
+                parsedServings = parseServings(text ?? '');
             }
-            parsedServings = parseServings(text ?? '');
-        }
-        const template = buildTemplate(buildCheckSpec(settings, parsedServings ?? 1, isMenu || parsedServings !== undefined), 'json');
-        // Per-person results do not depend on the preview scale, so scale 1 keeps the cache warm.
-        const result = await this.api.renderReport({ uri: context.uri, template, scale: 1 });
-        if (!result.ok) {
-            this.logOnce(result.reason, result.message);
-            // The cached subscription said yes but the service disagreed (expired sign-in, lapsed plan).
-            if (result.reason === 'unauthenticated' || result.reason === 'forbidden') {
-                return lockedBadge(settings.showWhenLocked);
+            const template = buildTemplate(buildCheckSpec(settings, parsedServings ?? 1, isMenu || parsedServings !== undefined), 'json');
+            // Per-person results do not depend on the preview scale, so scale 1 keeps the cache warm.
+            const result = await this.api.renderReport({ uri: context.uri, template, scale: 1 });
+            if (!result.ok) {
+                this.logOnce(result.reason, result.message);
+                // The cached subscription said yes but the service disagreed (expired sign-in, lapsed plan).
+                if (result.reason === 'unauthenticated' || result.reason === 'forbidden') {
+                    return lockedBadge(settings.showWhenLocked);
+                }
+                return undefined;
             }
-            return undefined;
-        }
-        const output = parseVitalsOutput(result.output);
-        if (!output) {
-            this.logOnce('output', 'unexpected template output');
+            const output = parseVitalsOutput(result.output);
+            if (!output) {
+                this.logOnce('output', 'unexpected template output');
+                return UNAVAILABLE_BADGE;
+            }
+            if (output.kind !== (isMenu ? 'plan' : 'recipe')) {
+                this.logOnce('output', 'template rendered the wrong kind');
+                return UNAVAILABLE_BADGE;
+            }
+            // A badge is about to be shown: any earlier failure has been superseded.
+            // An unreadable document is a standing condition, not a failure the success supersedes.
+            const readFailed = this.logged.has('read');
+            this.logged.clear();
+            if (readFailed) {
+                this.logged.add('read');
+            }
+            return badgeFor(evaluate(output, { mealsPerDay: settings.mealsPerDay, servingsKnown: isMenu || parsedServings !== undefined }));
+        } catch (error) {
+            this.logOnce('spec', String(error));
             return UNAVAILABLE_BADGE;
         }
-        // A badge is about to be shown: any earlier failure has been superseded.
-        // An unreadable document is a standing condition, not a failure the success supersedes.
-        const readFailed = this.logged.has('read');
-        this.logged.clear();
-        if (readFailed) {
-            this.logged.add('read');
-        }
-        return badgeFor(evaluate(output, { mealsPerDay: settings.mealsPerDay, servingsKnown: isMenu || parsedServings !== undefined }));
     }
 
     protected logOnce(reason: string, message: string): void {

@@ -1,4 +1,5 @@
 import { Check, CheckKind, CheckSpec } from './check-spec';
+import { LABEL_TEXT } from './nutrient-labels';
 import { NUTRIENT_KEY, STANDARDS, Standard } from './settings';
 
 /** `json` feeds the badge; `html` is the report tab. The first template line records it for humans; the branch is chosen here. */
@@ -7,7 +8,6 @@ export type TemplateMode = 'json' | 'html';
 /** The editor rejects longer templates (`cooklang.api.renderReport` / `openReport`). */
 export const MAX_TEMPLATE_LENGTH = 64 * 1024;
 
-const LABEL = /^[A-Za-z0-9 %-]{1,48}$/;
 const KINDS: readonly CheckKind[] = ['energy', 'macroPercent', 'min', 'max'];
 
 /** One evaluated check, as the template's `json` mode emits it. */
@@ -55,7 +55,7 @@ const COMPUTE = `
 {%- set vitamins = totals.vitamins if totals.vitamins is defined else {} -%}
 {%- if is_plan -%}
 {%- set days = (plan.days | length) if (plan.days | length) > 0 else 1 -%}
-{%- set people = plan.servings if (plan.servings is defined and plan.servings is not none and plan.servings >= 1) else 1 -%}
+{%- set people = plan.servings if (plan.servings is defined and plan.servings is not none and plan.servings is number and plan.servings >= 1) else 1 -%}
 {%- set day_factor = days -%}
 {%- else -%}
 {%- set days = 1 -%}
@@ -124,7 +124,7 @@ const COMPUTE = `
 {%- set matched = (agg["items"] | length) - (ph.names | length) -%}
 {%- set total = matched + (unmatched | length) -%}
 {%- set missing = (plan.missing_recipes | map(attribute="name") | list) if is_plan else [] -%}
-{%- set withheld = total == 0 or (matched / total) < 0.7 or (missing | length) > 0 -%}
+{%- set withheld = total == 0 or (matched / total) < 0.7 or (missing | length) > 0 or ns.counted == 0 -%}
 `;
 
 const JSON_OUTPUT = `
@@ -168,6 +168,7 @@ const HTML_OUTPUT = `
 <div class="notice"><strong>Verdict withheld.</strong>
 {%- if total == 0 %} No ingredients could be evaluated.
 {%- elif (missing | length) > 0 %} {{ missing | length }} referenced recipe{{ "s" if (missing | length) != 1 else "" }} could not be found, so the totals undercount.
+{%- elif ns.counted == 0 %} No check has a daily value in this standard.
 {%- else %} Only {{ matched }} of {{ total }} ingredients matched the nutrition database.{% endif %}
  The figures below are shown for reference.</div>
 {%- endif %}
@@ -180,7 +181,7 @@ const HTML_OUTPUT = `
 {%- for row in ns.rows %}{% if row.key == "kcal" and not row.skipped %}
 <div class="tile"><div class="muted">Energy</div><div class="big{% if not withheld %} {{ "ok" if row.ok else "bad" }}{% endif %}">{{ row.percent | round | int }} %</div><div class="muted">{{ row.actual | round | int }} / {{ row.target | round | int }} kcal</div></div>
 {%- endif %}{% endfor %}
-<div class="tile"><div class="muted">Data</div><div class="big">{{ matched }} / {{ total }}</div><div class="muted">ingredients matched · {{ totals.confidence_weighted | default("unknown") }}</div></div>
+<div class="tile"><div class="muted">Data</div><div class="big">{{ matched }} / {{ total }}</div><div class="muted">ingredients matched · {{ totals.confidence_weighted | default("unknown") | escape }}</div></div>
 </div>
 
 <h2>Macro split</h2>
@@ -276,7 +277,7 @@ function validate(check: Check): void {
     if (!NUTRIENT_KEY.test(check.key)) {
         throw new Error(`Check key "${check.key}" must be a plain slug.`);
     }
-    if (!LABEL.test(check.label)) {
+    if (!LABEL_TEXT.test(check.label)) {
         throw new Error(`Check label "${check.label}" must be plain text.`);
     }
     if (!KINDS.includes(check.kind)) {

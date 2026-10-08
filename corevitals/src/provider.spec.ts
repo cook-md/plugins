@@ -23,6 +23,7 @@ class Fixture {
     reads: string[] = [];
     texts = new Map<string, string>();
     settings: CoreVitalsSettings = SETTINGS;
+    readText: ((uri: string) => Promise<string | undefined>) | undefined;
 
     provider(): CoreVitalsBadgeProvider {
         const api = new CooklangApi(async (command, ...args) => {
@@ -37,6 +38,9 @@ class Fixture {
         }, async () => ['cooklang.api.hasFeature', 'cooklang.api.renderReport']);
         return new CoreVitalsBadgeProvider(api, message => this.logs.push(message), () => this.settings, async uri => {
             this.reads.push(uri);
+            if (this.readText) {
+                return this.readText(uri);
+            }
             return this.texts.get(uri);
         });
     }
@@ -156,6 +160,23 @@ describe('CoreVitalsBadgeProvider', () => {
         const count = fixture.logs.length;
         await provider.provide(RECIPE_CONTEXT);
         assert.strictEqual(fixture.logs.length, count);
+    });
+
+    it('returns the unavailable pill and logs once when something throws', async () => {
+        const fixture = new Fixture();
+        fixture.readText = async () => { throw new Error('boom'); };
+        const provider = fixture.provider();
+        assert.strictEqual((await provider.provide(RECIPE_CONTEXT))?.text, 'Vitals ?');
+        assert.strictEqual((await provider.provide(RECIPE_CONTEXT))?.text, 'Vitals ?');
+        assert.strictEqual(fixture.logs.length, 1);
+        assert.ok(fixture.logs[0].startsWith('Core Vitals unavailable (spec): Error: boom'), fixture.logs[0]);
+    });
+
+    it('returns the unavailable pill when the template rendered the wrong kind', async () => {
+        const fixture = new Fixture();
+        fixture.result = { ok: true, output: JSON.stringify({ ...OUTPUT, kind: 'recipe' }) };
+        assert.strictEqual((await fixture.provider().provide(PLAN_CONTEXT))?.text, 'Vitals ?');
+        assert.deepStrictEqual(fixture.logs, ['Core Vitals unavailable (output): template rendered the wrong kind']);
     });
 
     it('treats unauthenticated as locked and hides it when showWhenLocked is false', async () => {

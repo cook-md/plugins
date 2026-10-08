@@ -15,6 +15,11 @@ describe('parseServings', () => {
         assert.strictEqual(parseServings(''), undefined);
     });
 
+    it('skips a leading BOM and stops at the first servings key', () => {
+        assert.strictEqual(parseServings('\uFEFF---\nservings: 3\n---\n'), 3);
+        assert.strictEqual(parseServings('---\nservings: 0\nserves: 4\n---\n'), undefined);
+    });
+
     it('ignores a servings line outside the frontmatter', () => {
         assert.strictEqual(parseServings('---\ntitle: x\n---\nservings: 4\n'), undefined);
         assert.strictEqual(parseServings('intro\n---\nservings: 4\n---\n'), undefined);

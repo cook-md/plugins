@@ -33,6 +33,9 @@ const LABELS: Readonly<Record<string, string>> = {
     choline_mg: 'Choline',
 };
 
+/** What a check label may contain; the report template embeds labels verbatim. */
+export const LABEL_TEXT = /^[A-Za-z0-9 %-]{1,48}$/;
+
 const UNIT_SUFFIX = /_(g|mg|ug|iu)$/;
 
 /** Display label for an already-normalised (lower-case) nutrient key. */

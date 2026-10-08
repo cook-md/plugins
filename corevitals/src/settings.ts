@@ -1,3 +1,5 @@
+import { LABEL_TEXT, labelFor } from './nutrient-labels';
+
 export const STANDARDS = ['fda', 'eu', 'uk'] as const;
 export type Standard = typeof STANDARDS[number];
 
@@ -9,7 +11,7 @@ export const DEFAULT_MICRONUTRIENTS: readonly string[] = [
 ];
 export const MAX_MICRONUTRIENTS = 30;
 /** Nutrient keys are embedded in the template, so they must be plain slugs. */
-export const NUTRIENT_KEY = /^[a-z0-9_]{1,40}$/;
+export const NUTRIENT_KEY = /^[a-z][a-z0-9_]{0,39}$/;
 export const DEFAULT_TOLERANCE_PERCENT = 20;
 export const DEFAULT_MEALS_PER_DAY = 3;
 
@@ -58,7 +60,8 @@ export function readSettings(read: ReadSetting): CoreVitalsSettings {
             continue;
         }
         const key = entry.trim().toLowerCase();
-        if (!NUTRIENT_KEY.test(key) || seen.has(key)) {
+        // A key whose label the template would refuse (e.g. `a__b_mg`) is dropped here rather than throwing later.
+        if (!NUTRIENT_KEY.test(key) || seen.has(key) || !LABEL_TEXT.test(labelFor(key))) {
             continue;
         }
         seen.add(key);

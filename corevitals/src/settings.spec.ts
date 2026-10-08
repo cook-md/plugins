@@ -1,5 +1,7 @@
 import * as assert from 'assert';
+import { buildCheckSpec } from './check-spec';
 import { DEFAULT_MICRONUTRIENTS, MAX_MICRONUTRIENTS, readSettings } from './settings';
+import { buildTemplate } from './vitals-template';
 
 function read(values: Record<string, unknown>): (key: string) => unknown {
     return key => values[key];
@@ -51,8 +53,16 @@ describe('readSettings', () => {
     });
 
     it('normalises micronutrient keys: trims, lower-cases, validates, de-duplicates, drops always-checked keys', () => {
-        const settings = readSettings(read({ micronutrients: [' Iron_mg ', 'iron_mg', 'vit_c_mg', 'Bad Key', 42, 'sodium_mg', 'kcal', ''] }));
+        const settings = readSettings(read({ micronutrients: [' Iron_mg ', 'iron_mg', 'vit_c_mg', 'Bad Key', 42, 'sodium_mg', 'kcal', '', '_mg', '9lives_mg'] }));
         assert.deepStrictEqual(settings.micronutrients, ['iron_mg', 'vit_c_mg']);
+    });
+
+    it('never produces a key the template would refuse', () => {
+        let template = '';
+        assert.doesNotThrow(() => {
+            template = buildTemplate(buildCheckSpec(readSettings(read({ micronutrients: ['_mg', '___', 'a__b_mg', 'iron_mg'] })), 1), 'json');
+        });
+        assert.ok(template.includes('"iron_mg"'));
     });
 
     it('keeps an explicitly empty list empty and caps the list', () => {

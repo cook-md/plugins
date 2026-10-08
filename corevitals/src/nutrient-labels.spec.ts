@@ -17,6 +17,7 @@ describe('labelFor', () => {
 });
 
 describe('prettify', () => {
+    // Documents the fallback only: readSettings filters out keys whose label the template would refuse.
     it('returns the key itself when it has no words', () => {
         assert.strictEqual(prettify('_g'), '_g');
     });
