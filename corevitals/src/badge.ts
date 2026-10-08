@@ -25,7 +25,7 @@ export function badgeFor(verdict: Verdict): PillBadge {
     if (verdict.withheld) {
         return { kind: 'pill', text: UNKNOWN_TEXT, tone: 'neutral', tooltipMarkdown };
     }
-    // "Vitals " is 7 characters; two 3-digit counts and the slash fit in 24.
+    // "Vitals " is 7 characters; two counts of up to 8 digits and the slash still fit in 24.
     return { kind: 'pill', text: `Vitals ${verdict.met}/${verdict.counted}`, tone: toneFor(verdict.met, verdict.counted), tooltipMarkdown };
 }
 

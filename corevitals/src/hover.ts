@@ -1,5 +1,5 @@
 import { escapeMarkdown, formatNames, truncateName } from './markdown';
-import { Shortfall, Verdict } from './verdict';
+import { Shortfall, Verdict, WithheldReason } from './verdict';
 
 /** The editor truncates `tooltipMarkdown` at 4000 characters; stay clear of it. */
 export const MAX_HOVER_LENGTH = 3900;
@@ -54,12 +54,16 @@ function formatShortfalls(entries: readonly Shortfall[]): string {
     return shown.join(', ');
 }
 
-function withheldLine(verdict: Verdict): string {
-    switch (verdict.withheld) {
+function withheldLine(verdict: Verdict, reason: WithheldReason): string {
+    switch (reason) {
         case 'unmatched': return `Only ${verdict.matched} of ${verdict.total} ingredients matched the nutrition database.`;
         case 'missingRecipes': return `Missing recipes: ${formatNames(verdict.missingRecipes)}`;
         case 'noData': return verdict.kind === 'plan' ? 'This plan has no recipes that could be evaluated.' : 'This recipe has no ingredients that could be evaluated.';
-        default: return 'No daily values for the chosen checks in this standard.';
+        case 'noChecks': return 'No daily values for the chosen checks in this standard.';
+        default: {
+            const never: never = reason;
+            return never;
+        }
     }
 }
 
@@ -71,7 +75,7 @@ function withheldLine(verdict: Verdict): string {
 export function hoverMarkdown(verdict: Verdict): string {
     const blocks: string[] = [];
     if (verdict.withheld) {
-        blocks.push('**Core Vitals** · not enough data', periodLine(verdict), withheldLine(verdict));
+        blocks.push('**Core Vitals** · not enough data', periodLine(verdict), withheldLine(verdict, verdict.withheld));
     } else {
         blocks.push(`**Core Vitals** · ${verdict.met} of ${verdict.counted} targets met`, periodLine(verdict));
         if (verdict.below.length > 0) {
@@ -86,5 +90,6 @@ export function hoverMarkdown(verdict: Verdict): string {
     }
     blocks.push(`${verdict.matched} of ${verdict.total} ingredients matched (${verdict.confidence} confidence). Open the Core Vitals report for the full breakdown.`);
     const markdown = blocks.join('\n\n');
+    // Last-resort guard: every list above is already capped, so this never fires with well-formed output.
     return markdown.length <= MAX_HOVER_LENGTH ? markdown : `${markdown.slice(0, MAX_HOVER_LENGTH - 1)}…`;
 }

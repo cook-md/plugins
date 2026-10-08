@@ -78,6 +78,7 @@ describe('parseVitalsOutput', () => {
 
     it('rejects non-JSON, wrong kinds and bad rows', () => {
         assert.strictEqual(parseVitalsOutput('not json'), undefined);
+        assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, standard: 'who' })), undefined);
         assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, kind: 'week' })), undefined);
         assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, rows: [{ ...ROW, percent: 'NaN' }] })), undefined);
         assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, rows: [{ ...ROW, ok: 'yes' }] })), undefined);

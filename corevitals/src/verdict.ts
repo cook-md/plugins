@@ -1,4 +1,5 @@
 import { CheckKind } from './check-spec';
+import { Standard } from './settings';
 import { VitalsOutput, VitalsRow } from './vitals-template';
 
 /** Why no verdict is shown: nothing evaluated, a referenced recipe missing, too few ingredients matched, or no check had a daily value. */
@@ -30,7 +31,7 @@ export interface Verdict {
     kind: 'plan' | 'recipe';
     days: number;
     people: number;
-    standard: string;
+    standard: Standard;
     /** Meals per day the recipe is judged against (from the context). */
     mealsPerDay: number;
     /** Whether the recipe's servings were known (from the context). */

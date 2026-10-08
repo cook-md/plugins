@@ -1,5 +1,5 @@
 import { Check, CheckKind, CheckSpec } from './check-spec';
-import { NUTRIENT_KEY } from './settings';
+import { NUTRIENT_KEY, STANDARDS, Standard } from './settings';
 
 /** `json` feeds the badge; `html` is the report tab. The first template line records it for humans; the branch is chosen here. */
 export type TemplateMode = 'json' | 'html';
@@ -35,7 +35,7 @@ export interface VitalsOutput {
     kind: 'plan' | 'recipe';
     days: number;
     people: number;
-    standard: string;
+    standard: Standard;
     tol: number;
     rows: VitalsRow[];
     matched: number;
@@ -342,7 +342,7 @@ export function parseVitalsOutput(output: string): VitalsOutput | undefined {
         return undefined;
     }
     if (!isPlainObject(data) || (data.kind !== 'plan' && data.kind !== 'recipe') || !Array.isArray(data.rows)
-        || !isFiniteNumber(data.days) || !isFiniteNumber(data.people) || typeof data.standard !== 'string' || !isFiniteNumber(data.tol)
+        || !isFiniteNumber(data.days) || !isFiniteNumber(data.people) || !(STANDARDS as readonly unknown[]).includes(data.standard) || !isFiniteNumber(data.tol)
         || !isCount(data.matched) || !isCount(data.total) || data.matched > data.total) {
         return undefined;
     }
@@ -360,7 +360,7 @@ export function parseVitalsOutput(output: string): VitalsOutput | undefined {
         return undefined;
     }
     return {
-        kind: data.kind, days: data.days, people: data.people, standard: data.standard, tol: data.tol, rows,
+        kind: data.kind, days: data.days, people: data.people, standard: data.standard as Standard, tol: data.tol, rows,
         matched: data.matched, total: data.total, unmatched, missingRecipes,
         confidence: typeof data.confidence === 'string' ? data.confidence : '',
     };

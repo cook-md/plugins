@@ -38,6 +38,8 @@ describe('badgeFor', () => {
 
     it('keeps the pill within 24 characters even with large counts', () => {
         assert.ok(badgeFor(verdict({ met: 100, counted: 100 })).text.length <= 24);
+        assert.strictEqual(badgeFor(verdict({ met: 1, counted: 7 })).text, 'Vitals 1/7');
+        assert.strictEqual(badgeFor(verdict({ met: 10, counted: 12 })).text, 'Vitals 10/12');
     });
 });
 
