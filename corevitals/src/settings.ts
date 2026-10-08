@@ -22,7 +22,9 @@ export interface CoreVitalsSettings {
     carbPercent: number;
     fatPercent: number;
     micronutrients: readonly string[];
+    /** Band width around a target, 0–100. */
     tolerancePercent: number;
+    /** A recipe serving is judged against a day divided by this, 1–10. */
     mealsPerDay: number;
     showWhenLocked: boolean;
 }
@@ -44,6 +46,7 @@ function clamp(value: number, low: number, high: number): number {
     return Math.min(high, Math.max(low, value));
 }
 
+/** Normalises the raw `coreVitals.*` values; anything malformed falls back to its default. */
 export function readSettings(read: ReadSetting): CoreVitalsSettings {
     const rawStandard = read('standard');
     const standard = (STANDARDS as readonly unknown[]).includes(rawStandard) ? rawStandard as Standard : 'fda';
@@ -67,7 +70,7 @@ export function readSettings(read: ReadSetting): CoreVitalsSettings {
     let proteinPercent = percentOverride(read('proteinPercent'));
     let carbPercent = percentOverride(read('carbPercent'));
     let fatPercent = percentOverride(read('fatPercent'));
-    // Shares of energy that cannot all hold at once are a typo; use the bands instead.
+    // Set shares of energy that add up to more than 100 are a typo; use the bands instead (no further feasibility check).
     if (proteinPercent + carbPercent + fatPercent > 100) {
         proteinPercent = 0;
         carbPercent = 0;

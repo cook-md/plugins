@@ -57,8 +57,15 @@ describe('readSettings', () => {
 
     it('keeps an explicitly empty list empty and caps the list', () => {
         assert.deepStrictEqual(readSettings(read({ micronutrients: [] })).micronutrients, []);
-        const many = Array.from({ length: 40 }, (_, i) => `n${i}_mg`);
+        const many = ['Bad Key', '', ...Array.from({ length: 40 }, (_, i) => `n${i}_mg`)];
         assert.strictEqual(readSettings(read({ micronutrients: many })).micronutrients.length, MAX_MICRONUTRIENTS);
+    });
+
+    it('falls back on Infinity, booleans, negative tolerance and non-array micronutrients', () => {
+        assert.strictEqual(readSettings(read({ energyKcal: Number.POSITIVE_INFINITY })).energyKcal, 0);
+        assert.strictEqual(readSettings(read({ energyKcal: true })).energyKcal, 0);
+        assert.strictEqual(readSettings(read({ tolerancePercent: -5 })).tolerancePercent, 20);
+        assert.deepStrictEqual(readSettings(read({ micronutrients: 'iron_mg' })).micronutrients, [...DEFAULT_MICRONUTRIENTS]);
     });
 
     it('reads showWhenLocked as false only when explicitly false', () => {

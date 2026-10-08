@@ -11,14 +11,20 @@ const target = path.join(editor, 'plugins/cooklang.corevitals');
 // Skips test specs and source maps, which the packaged plugin doesn't need.
 const skipTestArtifacts = src => !/\.spec\.js$|\.map$/.test(src);
 
+const required = ['package.json', 'out', 'media', 'LICENSE'];
+const optional = ['README.md'];
+
+for (const entry of required) {
+    if (!fs.existsSync(path.join(root, entry))) {
+        throw new Error(`Missing ${entry}${entry === 'out' ? '; run npm run compile first' : ''}`);
+    }
+}
+
 fs.rmSync(target, { recursive: true, force: true });
 fs.mkdirSync(target, { recursive: true });
-for (const entry of ['package.json', 'out', 'media', 'README.md', 'LICENSE']) {
+for (const entry of [...required, ...optional]) {
     if (!fs.existsSync(path.join(root, entry))) {
-        if (entry === 'README.md') {
-            continue;
-        }
-        throw new Error(`Missing ${entry}; run npm run compile first`);
+        continue;
     }
     fs.cpSync(path.join(root, entry), path.join(target, entry), { recursive: true, filter: skipTestArtifacts });
 }

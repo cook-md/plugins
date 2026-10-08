@@ -57,6 +57,7 @@
           "type": "number",
           "default": 0,
           "minimum": 0,
+          "maximum": 10000,
           "order": 2,
           "description": "Daily energy target in kcal. 0 uses the standard's value (2000 kcal for FDA)."
         },
@@ -66,7 +67,7 @@
           "minimum": 0,
           "maximum": 100,
           "order": 3,
-          "description": "Protein as % of energy. 0 uses the 10–35 % range."
+          "description": "Protein as % of energy. 0 (or anything below 1) uses the 10–35 % range."
         },
         "coreVitals.carbPercent": {
           "type": "number",
@@ -74,7 +75,7 @@
           "minimum": 0,
           "maximum": 100,
           "order": 4,
-          "description": "Carbohydrate as % of energy. 0 uses the 45–65 % range."
+          "description": "Carbohydrate as % of energy. 0 (or anything below 1) uses the 45–65 % range."
         },
         "coreVitals.fatPercent": {
           "type": "number",
@@ -82,7 +83,7 @@
           "minimum": 0,
           "maximum": 100,
           "order": 5,
-          "description": "Fat as % of energy. 0 uses the 20–35 % range. If the set percentages add up to more than 100, all three fall back to the ranges."
+          "description": "Fat as % of energy. 0 (or anything below 1) uses the 20–35 % range. If the set percentages add up to more than 100, all three fall back to the ranges."
         },
         "coreVitals.micronutrients": {
           "type": "array",
