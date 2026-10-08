@@ -28,10 +28,6 @@ export interface Rename {
     to: string;
 }
 
-function isRecipePath(path: string): boolean {
-    return /\.cook$/i.test(path);
-}
-
 export class FavouritesStore {
 
     private file: BookmarksFile | undefined;
@@ -103,7 +99,7 @@ export class FavouritesStore {
         }
         await this.mutate(text => {
             for (const { from, to } of renames) {
-                text = isRecipePath(to) ? bookmarks.rename(text, from, to) : bookmarks.remove(text, from);
+                text = bookmarks.isRecipePath(to) ? bookmarks.rename(text, from, to) : bookmarks.remove(text, from);
                 text = bookmarks.renamePrefix(text, from, to);
             }
             return text;
@@ -141,7 +137,7 @@ export class FavouritesStore {
     }
 
     private enqueue<T>(task: () => Promise<T>): Promise<T> {
-        const next = this.queue.then(task, task);
+        const next = this.queue.then(task);
         this.queue = next.catch(() => undefined);
         return next;
     }

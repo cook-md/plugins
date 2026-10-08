@@ -24,6 +24,10 @@ describe('relativePath', () => {
         assert.strictEqual(relativePath(ROOT, ROOT), undefined);
         assert.strictEqual(relativePath(uri('file', '/ws2/a.cook'), ROOT), undefined);
     });
+
+    it('ignores the case of a Windows drive letter', () => {
+        assert.strictEqual(relativePath(uri('file', '/c:/ws/a.cook'), uri('file', '/C:/ws')), 'a.cook');
+    });
 });
 
 describe('recipeTarget', () => {
@@ -35,6 +39,10 @@ describe('recipeTarget', () => {
     it('rejects a preview context for a remote or out-of-workspace recipe', () => {
         assert.strictEqual(recipeTarget({ version: 1, uri: 'cooklang-hub:/r/1.cook', path: '', scale: 1 }, ROOT, undefined), undefined);
         assert.strictEqual(recipeTarget({ version: 1, uri: 'file:///elsewhere/a.cook', path: '', scale: 1 }, ROOT, undefined), undefined);
+    });
+
+    it('rejects a preview context for a non-recipe such as a menu', () => {
+        assert.strictEqual(recipeTarget({ version: 1, uri: 'file:///ws/plan.menu', path: 'plan.menu', scale: 1 }, ROOT, undefined), undefined);
     });
 
     it('uses a favourite tree item as is', () => {

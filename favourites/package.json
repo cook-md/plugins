@@ -45,12 +45,12 @@
       "cooklang/recipePreview/toolbar": [
         {
           "command": "cooklang.favourites.add",
-          "when": "cooklangPreviewScheme == file && cooklangPreviewPath && cooklangPreviewPath not in cooklang.favourites.paths",
+          "when": "cooklangPreviewScheme == file && cooklangPreviewPath =~ /\\.cook$/i && cooklangPreviewPath not in cooklang.favourites.paths",
           "group": "navigation@1"
         },
         {
           "command": "cooklang.favourites.remove",
-          "when": "cooklangPreviewScheme == file && cooklangPreviewPath in cooklang.favourites.paths",
+          "when": "cooklangPreviewScheme == file && cooklangPreviewPath =~ /\\.cook$/i && cooklangPreviewPath in cooklang.favourites.paths",
           "group": "navigation@1"
         }
       ],

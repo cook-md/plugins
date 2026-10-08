@@ -38,6 +38,7 @@ export class FavouritesTreeProvider implements vscode.TreeDataProvider<Favourite
         const entry = describeFavourite(element.favouritePath);
         const uri = vscode.Uri.parse(element.favouriteUri);
         const item = new vscode.TreeItem(entry.name, vscode.TreeItemCollapsibleState.None);
+        item.id = element.favouritePath;
         item.description = entry.folder;
         item.tooltip = entry.path;
         item.resourceUri = uri;

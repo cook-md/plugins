@@ -19,7 +19,9 @@ export function favouriteUri(root: vscode.Uri, path: string): vscode.Uri {
 export async function syncContext(store: FavouritesStore, root: vscode.Uri | undefined, api: CooklangApi): Promise<void> {
     const paths = [...store.paths()];
     const uris = root ? paths.map(path => favouriteUri(root, path).toString()) : [];
-    await vscode.commands.executeCommand('setContext', PATHS_CONTEXT_KEY, paths);
-    await vscode.commands.executeCommand('setContext', URIS_CONTEXT_KEY, uris);
+    await Promise.all([
+        vscode.commands.executeCommand('setContext', PATHS_CONTEXT_KEY, paths),
+        vscode.commands.executeCommand('setContext', URIS_CONTEXT_KEY, uris),
+    ]);
     await api.refreshBadges();
 }

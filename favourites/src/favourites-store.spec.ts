@@ -113,6 +113,23 @@ describe('FavouritesStore', () => {
         assert.strictEqual(store.hasWorkspace(), false);
     });
 
+    it('has() normalises its argument', async () => {
+        const { store } = await storeWith('Breakfast/Pancakes.cook\n');
+        assert.strictEqual(store.has('./Breakfast\\Pancakes.cook'), true);
+    });
+
+    it('a failed write rejects and leaves the list unchanged', async () => {
+        class FailingFile extends FakeFile {
+            async write(): Promise<void> {
+                throw new Error('disk full');
+            }
+        }
+        const store = new FavouritesStore();
+        await store.setFile(new FailingFile('a.cook\n'));
+        await assert.rejects(store.add('b.cook'), /disk full/);
+        assert.deepStrictEqual(store.paths(), ['a.cook']);
+    });
+
     it('setFile(undefined) clears the list', async () => {
         const { store, changes } = await storeWith('a.cook\n');
         await store.setFile(undefined);

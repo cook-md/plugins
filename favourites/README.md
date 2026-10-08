@@ -31,6 +31,8 @@ Dinner/Tomato Soup.cook
 - Renaming or deleting a recipe or folder inside Cook Editor updates the file.
   Moves made outside the editor leave an entry with a warning icon; remove it
   from the Favourites view.
+- The plugin writes the file with LF line endings; a file with CRLF endings is
+  rewritten to LF on its first edit.
 - Only the first folder of a multi-folder workspace is used.
 
 ## For plugin authors

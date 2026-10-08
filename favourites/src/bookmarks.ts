@@ -53,7 +53,13 @@ function dedupe(lines: readonly string[]): string[] {
 }
 
 function folderPrefix(dir: string): string {
-    return normalizePath(dir).replace(/\/+$/, '') + '/';
+    const folder = normalizePath(dir).replace(/\/+$/, '');
+    return folder === '' ? '' : folder + '/';
+}
+
+/** Whether a path names a recipe (`.cook`, any case). */
+export function isRecipePath(path: string): boolean {
+    return /\.cook$/i.test(path);
 }
 
 /** The favourites the text lists, normalised, in file order, without duplicates. */
@@ -90,7 +96,7 @@ export function rename(text: string, from: string, to: string): string {
     return joinLines(dedupe(splitLines(text).map(line => entryOf(line) === source ? target : line)));
 }
 
-/** Rewrites every favourite under `fromDir/` to live under `toDir/`. */
+/** Rewrites every favourite under `fromDir/` to live under `toDir/`; `toDir` may be `''` (the workspace root). */
 export function renamePrefix(text: string, fromDir: string, toDir: string): string {
     const source = folderPrefix(fromDir);
     const target = folderPrefix(toDir);

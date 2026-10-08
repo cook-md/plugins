@@ -81,16 +81,24 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         bindWorkspace().catch(reportError('Could not bind the workspace'));
     }));
 
-    const showToast = (added: boolean, path: string): void => {
+    const showToast = async (added: boolean, path: string): Promise<void> => {
         const message = added ? 'Added to Favourites' : 'Removed from Favourites';
-        Promise.resolve(vscode.window.showInformationMessage(message, 'Undo')).then(async choice => {
+        try {
+            const choice = await vscode.window.showInformationMessage(message, 'Undo');
             if (choice === 'Undo') {
                 await (added ? store.remove(path) : store.add(path));
             }
-        }).catch(reportError('Undo failed'));
+        } catch (error) {
+            reportError('Undo failed')(error);
+            vscode.window.showErrorMessage(`Could not update .bookmarks: ${error instanceof Error ? error.message : String(error)}`);
+        }
     };
 
     const run = async (action: Action, argument: unknown): Promise<void> => {
+        if (!store.hasWorkspace()) {
+            vscode.window.showInformationMessage(new NoWorkspaceError().message);
+            return;
+        }
         const target = recipeTarget(argument, root(), vscode.window.activeTextEditor?.document.uri);
         if (!target) {
             vscode.window.showInformationMessage('Open a recipe (.cook) to add it to Favourites.');
@@ -101,13 +109,19 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             if (action === 'toggle') {
                 nowFavourite = await store.toggle(target.path);
             } else if (action === 'add') {
-                await store.add(target.path);
+                if (!await store.add(target.path)) {
+                    vscode.window.showInformationMessage('Already in Favourites');
+                    return;
+                }
                 nowFavourite = true;
             } else {
-                await store.remove(target.path);
+                if (!await store.remove(target.path)) {
+                    vscode.window.showInformationMessage('Not in Favourites');
+                    return;
+                }
                 nowFavourite = false;
             }
-            showToast(nowFavourite, target.path);
+            void showToast(nowFavourite, target.path);
         } catch (error) {
             if (error instanceof NoWorkspaceError) {
                 vscode.window.showInformationMessage(error.message);
@@ -158,7 +172,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
         store.applyDeletes(deletes).catch(reportError('Could not follow a delete in .bookmarks'));
     }));
 
-    await bindWorkspace();
+    await bindWorkspace().catch(reportError('Could not bind the workspace'));
+    await syncContext(store, root(), api).catch(reportError('Could not update favourites context'));
 }
 
 export function deactivate(): void {

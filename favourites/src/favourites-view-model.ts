@@ -20,5 +20,5 @@ export function describeFavourite(path: string): FavouriteEntry {
 /** Entries sorted by name (case-insensitive), then path. */
 export function favouriteEntries(paths: readonly string[]): FavouriteEntry[] {
     return paths.map(describeFavourite).sort((a, b) =>
-        a.name.localeCompare(b.name, undefined, { sensitivity: 'base' }) || a.path.localeCompare(b.path));
+        a.name.localeCompare(b.name, undefined, { sensitivity: 'accent' }) || a.path.localeCompare(b.path));
 }

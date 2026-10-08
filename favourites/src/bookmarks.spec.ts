@@ -37,6 +37,10 @@ describe('bookmarks', () => {
         it('is a no-op when the path is already listed', () => {
             assert.strictEqual(add('a.cook\n', './a.cook'), 'a.cook\n');
         });
+
+        it('normalises CRLF input to LF', () => {
+            assert.strictEqual(add('a.cook\r\n', 'b.cook'), 'a.cook\nb.cook\n');
+        });
     });
 
     describe('remove', () => {
@@ -72,6 +76,14 @@ describe('bookmarks', () => {
 
         it('accepts a trailing slash on the folders', () => {
             assert.strictEqual(renamePrefix('Old/a.cook\n', 'Old/', 'New/'), 'New/a.cook\n');
+        });
+
+        it('moves entries to the root when the target folder is empty', () => {
+            assert.strictEqual(renamePrefix('Old/a.cook\nb.cook\n', 'Old', ''), 'a.cook\nb.cook\n');
+        });
+
+        it('drops an entry that collides with an existing one after the move', () => {
+            assert.strictEqual(renamePrefix('Old/a.cook\nNew/a.cook\n', 'Old', 'New'), 'New/a.cook\n');
         });
     });
 

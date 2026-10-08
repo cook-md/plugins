@@ -2,7 +2,7 @@
 // `PreviewOutletContext`, the Explorer passes a `Uri`, the Favourites view
 // passes a `FavouriteItem`, the palette passes nothing (active editor).
 // Free of the `vscode` import so it can be unit-tested.
-import { normalizePath } from './bookmarks';
+import { isRecipePath, normalizePath } from './bookmarks';
 
 /** The parts of `vscode.Uri` used here. */
 export interface UriLike {
@@ -54,8 +54,9 @@ function isUriLike(value: unknown): value is UriLike {
         && typeof candidate.scheme === 'string' && typeof candidate.path === 'string';
 }
 
-function isRecipePath(path: string): boolean {
-    return /\.cook$/i.test(path);
+/** Lower-cases a leading Windows drive letter (`/C:/x` → `/c:/x`); `vscode-uri` is inconsistent about it. */
+function normalizeDrive(path: string): string {
+    return path.replace(/^\/[A-Za-z]:/, drive => drive.toLowerCase());
 }
 
 /** `uri` relative to `root` (file scheme, strictly inside), or `undefined`. Not limited to recipes. */
@@ -63,11 +64,12 @@ export function relativePath(uri: UriLike, root: UriLike | undefined): string | 
     if (!root || uri.scheme !== 'file' || root.scheme !== 'file') {
         return undefined;
     }
-    const prefix = root.path.replace(/\/+$/, '') + '/';
-    if (!uri.path.startsWith(prefix) || uri.path.length === prefix.length) {
+    const prefix = normalizeDrive(root.path).replace(/\/+$/, '') + '/';
+    const path = normalizeDrive(uri.path);
+    if (!path.startsWith(prefix) || path.length === prefix.length) {
         return undefined;
     }
-    return normalizePath(uri.path.slice(prefix.length));
+    return normalizePath(path.slice(prefix.length));
 }
 
 /** Resolves the recipe a command refers to from its argument, falling back to the active editor. */
