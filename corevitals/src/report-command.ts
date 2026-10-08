@@ -43,8 +43,10 @@ export class OpenReportCommand {
 
     /** Opens the report tab; false when the editor lacks `cooklang.api.openReport`. */
     async open(uri: string): Promise<boolean> {
-        const servings = isMenuUri(uri) ? 1 : parseServings(await this.readText(uri) ?? '') ?? 1;
-        const template = buildTemplate(buildCheckSpec(this.settings(), servings), 'html');
+        const isMenu = isMenuUri(uri);
+        const parsedServings = isMenu ? undefined : parseServings(await this.readText(uri) ?? '');
+        const spec = buildCheckSpec(this.settings(), parsedServings ?? 1, isMenu || parsedServings !== undefined);
+        const template = buildTemplate(spec, 'html');
         return this.api.openReport({ uri, template, label: REPORT_LABEL, outputFormat: 'html', scale: 1 });
     }
 }

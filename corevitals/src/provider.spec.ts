@@ -76,6 +76,7 @@ describe('CoreVitalsBadgeProvider', () => {
         fixture.result = { ok: true, output: JSON.stringify({ ...OUTPUT, kind: 'recipe', days: 1, people: 4 }) };
         const badge = await fixture.provider().provide(RECIPE_CONTEXT);
         assert.ok(fixture.renders[0].template.includes('"servings": 4'), fixture.renders[0].template.slice(0, 400));
+        assert.ok(fixture.renders[0].template.includes('"servingsKnown": true'));
         assert.ok(badge?.tooltipMarkdown.includes('Per serving (4 servings) · one meal = ⅓ of a day'), badge?.tooltipMarkdown);
     });
 
@@ -84,6 +85,7 @@ describe('CoreVitalsBadgeProvider', () => {
         fixture.result = { ok: true, output: JSON.stringify({ ...OUTPUT, kind: 'recipe', days: 1, people: 1 }) };
         const badge = await fixture.provider().provide(RECIPE_CONTEXT);
         assert.ok(fixture.renders[0].template.includes('"servings": 1'));
+        assert.ok(fixture.renders[0].template.includes('"servingsKnown": false'));
         assert.ok(badge?.tooltipMarkdown.includes('Whole recipe (no servings in frontmatter)'), badge?.tooltipMarkdown);
     });
 

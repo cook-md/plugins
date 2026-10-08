@@ -16,6 +16,8 @@ describe('buildCheckSpec', () => {
         ]);
         assert.deepStrictEqual({ standard: spec.standard, tol: spec.tol, mealsPerDay: spec.mealsPerDay, servings: spec.servings },
             { standard: 'fda', tol: 20, mealsPerDay: 3, servings: 4 });
+        assert.strictEqual(buildCheckSpec(DEFAULTS, 4).servingsKnown, true);
+        assert.strictEqual(buildCheckSpec(DEFAULTS, 1, false).servingsKnown, false);
     });
 
     it('uses AMDR bands and kcal-per-gram factors for macros without overrides', () => {

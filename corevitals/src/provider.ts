@@ -54,7 +54,7 @@ export class CoreVitalsBadgeProvider {
             }
             parsedServings = parseServings(text ?? '');
         }
-        const template = buildTemplate(buildCheckSpec(settings, parsedServings ?? 1), 'json');
+        const template = buildTemplate(buildCheckSpec(settings, parsedServings ?? 1, isMenu || parsedServings !== undefined), 'json');
         // Per-person results do not depend on the preview scale, so scale 1 keeps the cache warm.
         const result = await this.api.renderReport({ uri: context.uri, template, scale: 1 });
         if (!result.ok) {

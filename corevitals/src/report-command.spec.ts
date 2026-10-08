@@ -47,6 +47,7 @@ describe('OpenReportCommand', () => {
             { uri: 'file:///ws/week.menu', label: 'Core Vitals', outputFormat: 'html', scale: 1 });
         assert.ok(opened[0].template.startsWith('{%- set mode = "html" -%}'));
         assert.ok(opened[0].template.includes('"standard": "uk"'));
+        assert.ok(opened[0].template.includes('"servingsKnown": true'));
     });
 
     it('uses the recipe servings', async () => {
@@ -54,6 +55,13 @@ describe('OpenReportCommand', () => {
         texts.set('file:///ws/a.cook', '---\nservings: 2\n---\n');
         await command.open('file:///ws/a.cook');
         assert.ok(opened[0].template.includes('"servings": 2'));
+        assert.ok(opened[0].template.includes('"servingsKnown": true'));
+    });
+
+    it('marks servings unknown when the recipe has none', async () => {
+        const { command, opened } = fixture(['cooklang.api.openReport']);
+        await command.open('file:///ws/b.cook');
+        assert.ok(opened[0].template.includes('"servingsKnown": false'));
     });
 
     it('reports an older editor', async () => {

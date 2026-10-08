@@ -25,6 +25,8 @@ export interface CheckSpec {
     mealsPerDay: number;
     /** Recipe servings (ignored for plans, which carry their own). */
     servings: number;
+    /** False when a recipe had no usable `servings:` and 1 was assumed; always true for plans. */
+    servingsKnown: boolean;
     checks: Check[];
 }
 
@@ -50,7 +52,7 @@ function macroCheck(key: MacroKey, override: number): Check {
 }
 
 /** Builds the checks for already-normalised settings; `servings` (recipes only) is clamped to at least 1. */
-export function buildCheckSpec(settings: CoreVitalsSettings, servings: number): CheckSpec {
+export function buildCheckSpec(settings: CoreVitalsSettings, servings: number, servingsKnown: boolean = true): CheckSpec {
     const energy: Check = { key: 'kcal', label: labelFor('kcal'), kind: 'energy', unit: 'kcal' };
     if (settings.energyKcal > 0) {
         energy.target = settings.energyKcal;
@@ -70,6 +72,7 @@ export function buildCheckSpec(settings: CoreVitalsSettings, servings: number): 
         tol: settings.tolerancePercent,
         mealsPerDay: settings.mealsPerDay,
         servings: Number.isFinite(servings) && servings >= 1 ? servings : 1,
+        servingsKnown,
         checks,
     };
 }

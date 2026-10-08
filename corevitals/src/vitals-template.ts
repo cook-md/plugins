@@ -161,7 +161,7 @@ const HTML_OUTPUT = `
 {%- if is_plan -%}
 {{ days }} day{{ "s" if days != 1 else "" }} · {{ people }} {{ "person" if people == 1 else "people" }}
 {%- else -%}
-Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal = 1/{{ spec.mealsPerDay }} of a day
+{%- if spec.servingsKnown -%}Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}){%- else -%}Whole recipe (no servings in frontmatter){%- endif %} · one meal = 1/{{ spec.mealsPerDay }} of a day
 {%- endif %}
  · {{ spec.standard | upper | escape }} daily values · tolerance ±{{ spec.tol }} %</p>
 {%- if withheld %}

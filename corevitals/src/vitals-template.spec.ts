@@ -24,6 +24,13 @@ describe('buildTemplate', () => {
         assert.ok(template.includes('| tojson'));
     });
 
+    it('tells the report whether servings were known', () => {
+        const template = buildTemplate(buildCheckSpec(SETTINGS, 1, false), 'html');
+        assert.ok(template.includes('"servingsKnown": false'));
+        assert.ok(template.includes('Whole recipe (no servings in frontmatter)'));
+        assert.ok(template.includes('{%- if spec.servingsKnown -%}'));
+    });
+
     it('never puts two closing braces next to each other inside the spec block', () => {
         const template = buildTemplate(buildCheckSpec(SETTINGS, 1), 'html');
         const specBlock = template.slice(template.indexOf('{%- set spec ='), template.indexOf('-%}', template.indexOf('{%- set spec =')));
