@@ -47,7 +47,7 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             }
         } catch (error) {
             output.appendLine(`Could not open the Core Vitals report: ${error}`);
-            vscode.window.showErrorMessage(`Could not open the Core Vitals report: ${error}`);
+            vscode.window.showErrorMessage(`Could not open the Core Vitals report: ${error instanceof Error ? error.message : String(error)}`);
         }
     }));
     // Changing a target should update open previews without an edit.
