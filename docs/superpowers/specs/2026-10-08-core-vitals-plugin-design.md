@@ -72,7 +72,7 @@ Labels for the macros, fiber, saturated fat, sodium and the default micros are a
 
 **Reliability.** From the aggregate totals: `matched = included_count − placeholders`, `total = included_count + failed_count`, where placeholders are items carrying a `nutrition_placeholder` warning (same rule as Nutri-Score). The verdict is withheld — `Vitals ?` — when `total` is 0, when `matched / total < 0.7`, or when `plan.missing_recipes` is non-empty. Confidence label: the service's `confidence_weighted` mapped to High (`confirmed`), Medium (`partial`) or Low (anything else).
 
-**Servings for recipes.** The plugin reads the document text (`workspace.openTextDocument(uri)`), takes the YAML frontmatter block between the opening `---` lines, and parses the leading integer of `servings:` (`servings: 4`, `servings: 4 people`). Missing or non-numeric → 1 and the hover says "whole recipe (no servings in frontmatter)". The number is passed into the template as part of the spec.
+**Servings for recipes.** The plugin reads the document text (`workspace.openTextDocument(uri)`), takes the closed YAML frontmatter block between the opening `---` line and the next `---` line, and parses the leading integer of `servings:`, `serves:` or `yield:` (the keys Cooklang treats as servings), quoted or not (`servings: 4`, `servings: "4"`, `yield: 6 portions`). Missing, non-numeric, zero, above 1000, or in an unclosed block → unknown: 1 is assumed and the hover says "whole recipe (no servings in frontmatter)". The number is passed into the template as part of the spec; whether it was known travels with the verdict (`servingsKnown`), as does `mealsPerDay`, so the hover depends on the verdict alone.
 
 ## Template
 
