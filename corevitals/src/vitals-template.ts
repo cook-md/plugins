@@ -131,8 +131,12 @@ const JSON_OUTPUT = `
 {{ {"kind": "plan" if is_plan else "recipe", "days": days, "people": people, "standard": spec.standard, "tol": spec.tol, "rows": ns.rows, "matched": matched, "total": total, "unmatched": unmatched, "missingRecipes": missing, "confidence": totals.confidence_weighted} | tojson }}
 `;
 
-/** The report. Colours come from the editor theme; charts are inline SVG (the editor strips scripts). */
+/**
+ * The report. Colours come from the editor theme; charts are inline SVG (the editor strips scripts).
+ * The <style> sits inside the section: DOMPurify drops a leading <style> (it parses into <head>).
+ */
 const HTML_OUTPUT = `
+<section class="corevitals">
 <style>
 .corevitals{color:var(--theia-foreground);max-width:920px;line-height:1.45}
 .corevitals h1{font-size:1.5em;margin:0 0 .2em}
@@ -146,13 +150,12 @@ const HTML_OUTPUT = `
 .corevitals .bad{color:var(--theia-charts-red)}
 .corevitals table{border-collapse:collapse;width:100%}
 .corevitals th,.corevitals td{padding:4px 8px;text-align:left;border-bottom:1px solid var(--theia-editorWidget-border);vertical-align:middle}
-.corevitals td.num{text-align:right;white-space:nowrap}
+.corevitals td.num,.corevitals th.num{text-align:right;white-space:nowrap}
 .corevitals .legend span{display:inline-block;margin-right:14px}
 .corevitals .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .corevitals ul{margin:.3em 0 0 1.2em}
 .corevitals svg{max-width:100%;height:auto}
 </style>
-<section class="corevitals">
 <h1>Core Vitals · {{ (metadata.title if (metadata is defined and metadata.title is defined and metadata.title) else "Report") | escape }}</h1>
 <p class="period">
 {%- if is_plan -%}
@@ -223,7 +226,7 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
 {%- if kcal > dayrows.max %}{% set dayrows.max = kcal %}{% endif %}
 {%- set dayrows.list = dayrows.list + [{"label": (day.date if (day.date is defined and day.date) else (day.name if (day.name is defined and day.name) else ("Day " ~ loop.index))), "kcal": kcal, "protein_g": m.protein_g / people, "carb_g": m.carb_g / people, "fat_g": m.fat_g / people}] %}
 {%- endfor %}
-{%- set chart_w = 40 + (dayrows.list | length) * 56 %}
+{%- set chart_w = 40 + (dayrows.list | length) * 72 %}
 {%- set scale = (140 / dayrows.max) if dayrows.max > 0 else 0 %}
 <h2>Energy per day</h2>
 <svg width="{{ chart_w }}" height="190" viewBox="0 0 {{ chart_w }} 190" role="img" aria-label="Energy per person per day">
@@ -233,9 +236,9 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
 {%- endif %}
 {%- for d in dayrows.list %}
 {%- set h = d.kcal * scale %}
-<rect x="{{ 40 + (loop.index0 * 56) }}" y="{{ (160 - h) | round(1) }}" width="36" height="{{ h | round(1) }}" rx="3" fill="var(--theia-charts-blue)"></rect>
-<text x="{{ 58 + (loop.index0 * 56) }}" y="{{ (154 - h) | round(1) }}" font-size="10" text-anchor="middle" fill="var(--theia-foreground)">{{ d.kcal | round | int }}</text>
-<text x="{{ 58 + (loop.index0 * 56) }}" y="178" font-size="10" text-anchor="middle" fill="var(--theia-descriptionForeground)">{{ (d.label | string)[:10] | escape }}</text>
+<rect x="{{ 40 + (loop.index0 * 72) }}" y="{{ (160 - h) | round(1) }}" width="36" height="{{ h | round(1) }}" rx="3" fill="var(--theia-charts-blue)"></rect>
+<text x="{{ 58 + (loop.index0 * 72) }}" y="{{ (154 - h) | round(1) }}" font-size="10" text-anchor="middle" fill="var(--theia-foreground)">{{ d.kcal | round | int }}</text>
+<text x="{{ 58 + (loop.index0 * 72) }}" y="178" font-size="10" text-anchor="middle" fill="var(--theia-descriptionForeground)">{{ (d.label | string)[:10] | escape }}</text>
 {%- endfor %}
 </svg>
 <table>
