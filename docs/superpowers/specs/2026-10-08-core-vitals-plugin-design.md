@@ -86,7 +86,7 @@ One Jinja template string, built in TypeScript from the check spec, rendered thr
 {%- set agg = aggregate_nutrition(ings) -%}
 … compute period, actuals, one `row` per check with key, label, kind, actual, target, unit, percent, ok, skipped …
 {%- if mode == "json" -%}
-{{ {"kind": "plan" | "recipe", "period": {...}, "standard": ..., "rows": rows, "matched": ..., "total": ..., "unmatched": [...], "missingRecipes": [...], "confidence": agg.totals.confidence_weighted, "days": [...]} | tojson }}
+{{ {"kind": "plan" | "recipe", "days": days, "people": people, "standard": ..., "tol": ..., "rows": rows, "matched": ..., "total": ..., "unmatched": [...], "missingRecipes": [...], "confidence": agg.totals.confidence_weighted} | tojson }}
 {%- else -%}
 <style>…</style><section class="vitals">… HTML report …</section>
 {%- endif -%}
@@ -148,9 +148,9 @@ The command calls `cooklang.api.openReport({ uri, template: <html mode>, label: 
 
 HTML content, top to bottom, styled by a `<style>` block scoped under `.corevitals` using `--theia-*` colours (`--theia-charts-green/yellow/red` for status, `--theia-foreground`, `--theia-descriptionForeground`, `--theia-editorWidget-border`). Scripts are never used; DOMPurify strips them anyway. Inline SVG draws every chart:
 
-1. **Header**: plan title (`metadata.title` or the file name), period line (days, people or servings, standard, tolerance).
-2. **Summary tiles**: targets met `14 / 17`; energy `3 800 / 4 000 kcal (95 %)`; confidence `High · 18 of 20 matched`. Withheld verdicts show the reason tile instead of the count.
-3. **Macro split**: one stacked horizontal bar (protein / carbohydrate / fat share of energy) with the AMDR bands or override targets drawn as bracket markers under it, and the three percentages with ✓ / ✗.
+1. **Header**: plan title (`metadata.title`, or "Report" when the file has none; the template does not see the file name), period line (days, people or servings, standard, tolerance).
+2. **Summary tiles**: targets met `14 / 17`; energy `3 800 / 4 000 kcal (95 %)`; data `18 / 20 ingredients matched · partial`. Withheld verdicts show a `?` verdict tile instead of the count, under a notice naming the reason.
+3. **Macro split**: one stacked horizontal bar (protein / carbohydrate / fat share of energy) and a legend with each share, its acceptable range in brackets, and ✓ / ✗.
 4. **Nutrient table**: one row per check: label, actual with unit, target, a horizontal bar whose width is `min(percent, 150) / 150` of the column, tinted by status, a dashed line at 100 %, and the percent. Limits (`max`) say "limit" instead of "target". Skipped rows show "no daily value" greyed.
 5. **Per-day energy** (plans with ≥ 2 days only): grouped column chart, one column per day for kcal per person, with a dashed target line; below it a small table with per-day protein / carb / fat grams.
 6. **Could not check**: unmatched ingredients, missing recipes, skipped keys. Always present, even when empty ("Everything was matched").
