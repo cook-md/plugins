@@ -242,7 +242,7 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
 <thead><tr><th>Day</th><th class="num">kcal</th><th class="num">Protein</th><th class="num">Carbohydrate</th><th class="num">Fat</th></tr></thead>
 <tbody>
 {%- for d in dayrows.list %}
-<tr><td>{{ (d.label | string)[:10] | escape }}</td><td class="num">{{ d.kcal | round | int }}</td><td class="num">{{ d.protein_g | round | int }} g</td><td class="num">{{ d.carb_g | round | int }} g</td><td class="num">{{ d.fat_g | round | int }} g</td></tr>
+<tr><td>{{ d.label | escape }}</td><td class="num">{{ d.kcal | round | int }}</td><td class="num">{{ d.protein_g | round | int }} g</td><td class="num">{{ d.carb_g | round | int }} g</td><td class="num">{{ d.fat_g | round | int }} g</td></tr>
 {%- endfor %}
 </tbody>
 </table>
