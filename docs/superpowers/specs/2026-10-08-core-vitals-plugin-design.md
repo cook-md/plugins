@@ -127,6 +127,7 @@ Markdown, escaped like Nutri-Score's trust card, kept ≤ 3900 characters (lists
 2 days · 2 people · FDA daily values
 
 Below target: Iron 54 %, Fiber 71 %
+
 Over limit: Sodium 132 %
 
 18 of 20 ingredients matched (High confidence). Open the Core Vitals report for the full breakdown.
@@ -138,7 +139,7 @@ Withheld variants replace the first line with `**Core Vitals** · not enough dat
 
 Locked variant: `**Core Vitals** · with Cook Basic and Pro` + the Nutri-Score upgrade sentence and `[See plans](https://cook.md/pricing)`.
 
-Block order: title, period line, below-target, over-limit, (no-daily-value line: `No daily value for: boron_ug`), data line.
+Block order (blocks separated by blank lines): title, period line, below-target, over-limit, (no-daily-value line with labels: `No daily value for: Boron`), data line.
 
 ## Report
 
