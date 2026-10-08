@@ -20,6 +20,7 @@ class Fixture {
     result: PluginReportResult = { ok: true, output: JSON.stringify(OUTPUT) };
     renders: Array<{ uri: string; template: string; scale: number }> = [];
     logs: string[] = [];
+    reads: string[] = [];
     texts = new Map<string, string>();
     settings: CoreVitalsSettings = SETTINGS;
 
@@ -34,7 +35,10 @@ class Fixture {
             }
             throw new Error(`unexpected command ${command}`);
         }, async () => ['cooklang.api.hasFeature', 'cooklang.api.renderReport']);
-        return new CoreVitalsBadgeProvider(api, message => this.logs.push(message), () => this.settings, async uri => this.texts.get(uri));
+        return new CoreVitalsBadgeProvider(api, message => this.logs.push(message), () => this.settings, async uri => {
+            this.reads.push(uri);
+            return this.texts.get(uri);
+        });
     }
 }
 
@@ -121,5 +125,42 @@ describe('CoreVitalsBadgeProvider', () => {
         fixture.result = { ok: true, output: 'garbage' };
         await provider.provide(PLAN_CONTEXT);
         assert.strictEqual(fixture.logs.length, 2);
+    });
+
+    it('never reads the document for a plan', async () => {
+        const fixture = new Fixture();
+        await fixture.provider().provide(PLAN_CONTEXT);
+        assert.deepStrictEqual(fixture.reads, []);
+    });
+
+    it('reads the recipe once and does not read when locked', async () => {
+        const fixture = new Fixture();
+        fixture.texts.set('file:///ws/Pancakes.cook', 'Mix @eggs{2}.');
+        fixture.result = { ok: true, output: JSON.stringify({ ...OUTPUT, kind: 'recipe', days: 1, people: 1 }) };
+        const provider = fixture.provider();
+        await provider.provide(RECIPE_CONTEXT);
+        assert.deepStrictEqual(fixture.reads, ['file:///ws/Pancakes.cook']);
+        fixture.features.clear();
+        await provider.provide(RECIPE_CONTEXT);
+        assert.deepStrictEqual(fixture.reads, ['file:///ws/Pancakes.cook']);
+    });
+
+    it('logs once when the recipe text cannot be read', async () => {
+        const fixture = new Fixture();
+        fixture.result = { ok: true, output: JSON.stringify({ ...OUTPUT, kind: 'recipe', days: 1, people: 1 }) };
+        const provider = fixture.provider();
+        await provider.provide(RECIPE_CONTEXT);
+        assert.strictEqual(fixture.logs[0], 'Core Vitals unavailable (read): could not read the recipe text; assuming one serving');
+        const count = fixture.logs.length;
+        await provider.provide(RECIPE_CONTEXT);
+        assert.strictEqual(fixture.logs.length, count);
+    });
+
+    it('treats unauthenticated as locked and hides it when showWhenLocked is false', async () => {
+        const fixture = new Fixture();
+        fixture.result = { ok: false, reason: 'unauthenticated', message: 'x' };
+        assert.strictEqual((await fixture.provider().provide(PLAN_CONTEXT))?.text, '🔒 Vitals');
+        fixture.settings = { ...SETTINGS, showWhenLocked: false };
+        assert.strictEqual(await fixture.provider().provide(PLAN_CONTEXT), undefined);
     });
 });

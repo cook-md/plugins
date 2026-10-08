@@ -9,7 +9,7 @@ import { buildTemplate, parseVitalsOutput } from './vitals-template';
 /** Reads a document's current text (unsaved edits included); undefined when it cannot be read. */
 export type ReadText = (uri: string) => Promise<string | undefined>;
 
-/** The context the editor passes to badge outlet commands (version 1). */
+/** Whether a value is the version 1 context the editor passes to badge outlet commands. */
 export function isPreviewContext(value: unknown): value is PreviewOutletContext {
     const context = value as PreviewOutletContext;
     return typeof value === 'object' && value !== null
@@ -34,6 +34,7 @@ export class CoreVitalsBadgeProvider {
         protected readonly readText: ReadText,
     ) { }
 
+    /** The badge for a preview context, or undefined for no badge. */
     async provide(context: unknown): Promise<PillBadge | undefined> {
         if (!isPreviewContext(context)) {
             return undefined;
@@ -45,7 +46,14 @@ export class CoreVitalsBadgeProvider {
             return lockedBadge(settings.showWhenLocked);
         }
         const isMenu = isMenuUri(context.uri);
-        const parsedServings = isMenu ? undefined : parseServings(await this.readText(context.uri) ?? '');
+        let parsedServings: number | undefined;
+        if (!isMenu) {
+            const text = await this.readText(context.uri);
+            if (text === undefined) {
+                this.logOnce('read', 'could not read the recipe text; assuming one serving');
+            }
+            parsedServings = parseServings(text ?? '');
+        }
         const template = buildTemplate(buildCheckSpec(settings, parsedServings ?? 1), 'json');
         // Per-person results do not depend on the preview scale, so scale 1 keeps the cache warm.
         const result = await this.api.renderReport({ uri: context.uri, template, scale: 1 });
@@ -63,7 +71,12 @@ export class CoreVitalsBadgeProvider {
             return UNAVAILABLE_BADGE;
         }
         // A badge is about to be shown: any earlier failure has been superseded.
+        // An unreadable document is a standing condition, not a failure the success supersedes.
+        const readFailed = this.logged.has('read');
         this.logged.clear();
+        if (readFailed) {
+            this.logged.add('read');
+        }
         return badgeFor(evaluate(output, { mealsPerDay: settings.mealsPerDay, servingsKnown: isMenu || parsedServings !== undefined }));
     }
 
