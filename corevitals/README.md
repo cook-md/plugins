@@ -10,6 +10,8 @@ The heartbeat icon next to the shopping-list cart opens the full report: targets
 
 `Vitals ?` means the data does not support a verdict: fewer than 70 % of the ingredients matched the nutrition database, a referenced recipe was not found, or nothing could be evaluated. The hover says which.
 
+Note: in the current Cook Editor a `.menu` file opens with the XML language, so edits to a menu do not refresh an open report or badge until the editor fixes the association. Workaround: add `"files.associations": { "*.menu": "cooklang" }` to your settings.
+
 ## Targets
 
 Daily values come from the cook.md nutrition service (**Settings → Extensions → Core Vitals**):
@@ -22,6 +24,8 @@ Daily values come from the cook.md nutrition service (**Settings → Extensions 
 - **Meals per day**: a recipe serving is judged against a day divided by this.
 
 Plans use the menu's `servings:` frontmatter as the number of people and count a day per `= Day … =` section. Recipes use their `servings:` (or `serves:` / `yield:`) frontmatter; without one, the whole recipe counts as one serving and the hover says so.
+
+A report tab keeps the targets it was opened with; after changing a setting, click the heartbeat icon again to refresh it (the badge updates on its own).
 
 ## Plans
 
