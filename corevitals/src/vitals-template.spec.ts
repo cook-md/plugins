@@ -37,6 +37,22 @@ describe('buildTemplate', () => {
         assert.ok(template.length < MAX_TEMPLATE_LENGTH, `${template.length}`);
     });
 
+    it('escapes every untrusted print in the html mode', () => {
+        const template = buildTemplate(buildCheckSpec(SETTINGS, 1), 'html');
+        assert.ok(template.includes('row.label | escape'));
+        assert.ok(template.includes('name | escape'));
+        assert.ok(template.includes('d.label | string)[:10] | escape'));
+        assert.ok(!template.includes('{{ row.label }}'));
+        assert.ok(!template.includes('{{ name }}'));
+    });
+
+    it('hides the count tile when withheld', () => {
+        const template = buildTemplate(buildCheckSpec(SETTINGS, 1), 'html');
+        const guard = template.indexOf('{%- if not withheld %}');
+        assert.ok(guard >= 0);
+        assert.ok(guard < template.indexOf('Targets met'));
+    });
+
     it('accepts the longest label a 40-character key can produce', () => {
         const spec = buildCheckSpec({ ...SETTINGS, micronutrients: ['vit_abcdefghi_abcdefghi_abcdefghi_abcdef'] }, 1);
         assert.strictEqual(spec.checks[7].label.length, 44);
@@ -66,6 +82,7 @@ describe('parseVitalsOutput', () => {
         assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, rows: [{ ...ROW, ok: 'yes' }] })), undefined);
         assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, rows: [{ ...ROW, kind: 'avg' }] })), undefined);
         assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, matched: -1 })), undefined);
+        assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, matched: 25 })), undefined);
         assert.strictEqual(parseVitalsOutput(JSON.stringify({ ...OUTPUT, unmatched: 'saffron' })), undefined);
     });
 

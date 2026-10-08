@@ -1,6 +1,7 @@
 import { Check, CheckKind, CheckSpec } from './check-spec';
 import { NUTRIENT_KEY } from './settings';
 
+/** `json` feeds the badge; `html` is the report tab. The first template line records it for humans; the branch is chosen here. */
 export type TemplateMode = 'json' | 'html';
 
 /** The editor rejects longer templates (`cooklang.api.renderReport` / `openReport`). */
@@ -29,6 +30,7 @@ export interface VitalsRow {
     skipped: boolean;
 }
 
+/** The validated `json`-mode payload. */
 export interface VitalsOutput {
     kind: 'plan' | 'recipe';
     days: number;
@@ -148,6 +150,7 @@ const HTML_OUTPUT = `
 .corevitals .legend span{display:inline-block;margin-right:14px}
 .corevitals .swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:middle}
 .corevitals ul{margin:.3em 0 0 1.2em}
+.corevitals svg{max-width:100%;height:auto}
 </style>
 <section class="corevitals">
 <h1>Core Vitals · {{ (metadata.title if (metadata is defined and metadata.title is defined and metadata.title) else "Report") | escape }}</h1>
@@ -156,8 +159,8 @@ const HTML_OUTPUT = `
 {{ days }} day{{ "s" if days != 1 else "" }} · {{ people }} {{ "person" if people == 1 else "people" }}
 {%- else -%}
 Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal = 1/{{ spec.mealsPerDay }} of a day
-{%- endif -%}
- · {{ spec.standard | upper }} daily values · tolerance ±{{ spec.tol }} %</p>
+{%- endif %}
+ · {{ spec.standard | upper | escape }} daily values · tolerance ±{{ spec.tol }} %</p>
 {%- if withheld %}
 <div class="notice"><strong>Verdict withheld.</strong>
 {%- if total == 0 %} No ingredients could be evaluated.
@@ -166,9 +169,13 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
  The figures below are shown for reference.</div>
 {%- endif %}
 <div class="tiles">
+{%- if not withheld %}
 <div class="tile"><div class="muted">Targets met</div><div class="big">{{ ns.met }} / {{ ns.counted }}</div></div>
+{%- else %}
+<div class="tile"><div class="muted">Verdict</div><div class="big">?</div></div>
+{%- endif %}
 {%- for row in ns.rows %}{% if row.key == "kcal" and not row.skipped %}
-<div class="tile"><div class="muted">Energy</div><div class="big {{ "ok" if row.ok else "bad" }}">{{ row.percent | round | int }} %</div><div class="muted">{{ row.actual | round | int }} / {{ row.target | round | int }} kcal</div></div>
+<div class="tile"><div class="muted">Energy</div><div class="big{% if not withheld %} {{ "ok" if row.ok else "bad" }}{% endif %}">{{ row.percent | round | int }} %</div><div class="muted">{{ row.actual | round | int }} / {{ row.target | round | int }} kcal</div></div>
 {%- endif %}{% endfor %}
 <div class="tile"><div class="muted">Data</div><div class="big">{{ matched }} / {{ total }}</div><div class="muted">ingredients matched · {{ totals.confidence_weighted | default("unknown") }}</div></div>
 </div>
@@ -178,13 +185,13 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
 <svg width="600" height="18" viewBox="0 0 600 18" role="img" aria-label="Share of energy from protein, carbohydrate and fat">
 {%- for row in ns.rows %}{% if row.kind == "macroPercent" %}
 {%- set w = row.percent / 100 * 600 %}
-<rect x="{{ sb.x }}" y="0" width="{{ w | round(1) }}" height="18" fill="{{ "var(--theia-charts-blue)" if row.key == "protein_g" else ("var(--theia-charts-orange)" if row.key == "carb_g" else "var(--theia-charts-purple)") }}"></rect>
+<rect x="{{ sb.x | round(1) }}" y="0" width="{{ w | round(1) }}" height="18" fill="{{ "var(--theia-charts-blue)" if row.key == "protein_g" else ("var(--theia-charts-orange)" if row.key == "carb_g" else "var(--theia-charts-purple)") }}"></rect>
 {%- set sb.x = sb.x + w %}
 {%- endif %}{% endfor %}
 </svg>
 <p class="legend">
 {%- for row in ns.rows %}{% if row.kind == "macroPercent" %}
-<span><i class="swatch" style="background:{{ "var(--theia-charts-blue)" if row.key == "protein_g" else ("var(--theia-charts-orange)" if row.key == "carb_g" else "var(--theia-charts-purple)") }}"></i>{{ row.label }} {{ row.percent | round | int }} % <span class="muted">({{ row.lo | round | int }}–{{ row.hi | round | int }})</span> <span class="{{ "ok" if row.ok else "bad" }}">{{ "✓" if row.ok else "✗" }}</span></span>
+<span><i class="swatch" style="background:{{ "var(--theia-charts-blue)" if row.key == "protein_g" else ("var(--theia-charts-orange)" if row.key == "carb_g" else "var(--theia-charts-purple)") }}"></i>{{ row.label | escape }} {{ row.percent | round | int }} % <span class="muted">({{ row.lo | round | int }}–{{ row.hi | round | int }})</span> <span class="{{ "ok" if row.ok else "bad" }}">{{ "✓" if row.ok else "✗" }}</span></span>
 {%- endif %}{% endfor %}
 </p>
 
@@ -194,12 +201,12 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
 <tbody>
 {%- for row in ns.rows %}{% if row.kind != "macroPercent" %}
 <tr>
-<td>{{ row.label }}{% if row.kind == "max" %} <span class="muted">(limit)</span>{% endif %}</td>
-<td class="num">{{ row.actual | round(1) }} {{ row.unit }}</td>
+<td>{{ row.label | escape }}{% if row.kind == "max" %} <span class="muted">(limit)</span>{% endif %}</td>
+<td class="num">{{ row.actual | round(1) }} {{ row.unit | escape }}</td>
 {%- if row.skipped %}
 <td class="num muted">no daily value</td><td></td><td></td>
 {%- else %}
-<td class="num">{{ row.target | round(1) }} {{ row.unit }}</td>
+<td class="num">{{ row.target | round(1) }} {{ row.unit | escape }}</td>
 <td><svg width="220" height="12" viewBox="0 0 220 12"><rect width="220" height="12" rx="3" fill="var(--theia-editorWidget-border)"></rect><rect width="{{ (([row.percent, 150] | min) / 150 * 220) | round(1) }}" height="12" rx="3" fill="{{ "var(--theia-charts-green)" if row.ok else "var(--theia-charts-red)" }}"></rect><line x1="146.7" y1="0" x2="146.7" y2="12" stroke="var(--theia-foreground)" stroke-dasharray="2 2"></line></svg></td>
 <td class="num {{ "ok" if row.ok else "bad" }}">{{ row.percent | round | int }} %</td>
 {%- endif %}
@@ -228,14 +235,14 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
 {%- set h = d.kcal * scale %}
 <rect x="{{ 40 + (loop.index0 * 56) }}" y="{{ (160 - h) | round(1) }}" width="36" height="{{ h | round(1) }}" rx="3" fill="var(--theia-charts-blue)"></rect>
 <text x="{{ 58 + (loop.index0 * 56) }}" y="{{ (154 - h) | round(1) }}" font-size="10" text-anchor="middle" fill="var(--theia-foreground)">{{ d.kcal | round | int }}</text>
-<text x="{{ 58 + (loop.index0 * 56) }}" y="178" font-size="10" text-anchor="middle" fill="var(--theia-descriptionForeground)">{{ d.label | escape }}</text>
+<text x="{{ 58 + (loop.index0 * 56) }}" y="178" font-size="10" text-anchor="middle" fill="var(--theia-descriptionForeground)">{{ (d.label | string)[:10] | escape }}</text>
 {%- endfor %}
 </svg>
 <table>
 <thead><tr><th>Day</th><th class="num">kcal</th><th class="num">Protein</th><th class="num">Carbohydrate</th><th class="num">Fat</th></tr></thead>
 <tbody>
 {%- for d in dayrows.list %}
-<tr><td>{{ d.label | escape }}</td><td class="num">{{ d.kcal | round | int }}</td><td class="num">{{ d.protein_g | round | int }} g</td><td class="num">{{ d.carb_g | round | int }} g</td><td class="num">{{ d.fat_g | round | int }} g</td></tr>
+<tr><td>{{ (d.label | string)[:10] | escape }}</td><td class="num">{{ d.kcal | round | int }}</td><td class="num">{{ d.protein_g | round | int }} g</td><td class="num">{{ d.carb_g | round | int }} g</td><td class="num">{{ d.fat_g | round | int }} g</td></tr>
 {%- endfor %}
 </tbody>
 </table>
@@ -255,7 +262,7 @@ Per serving ({{ people }} serving{{ "s" if people != 1 else "" }}) · one meal =
 {%- endif %}
 {%- endif %}
 {%- for row in ns.rows %}{% if row.skipped %}
-<p class="muted">No daily value for {{ row.label }} ({{ row.key }}) in the {{ spec.standard | upper }} table.</p>
+<p class="muted">No daily value for {{ row.label | escape }} ({{ row.key | escape }}) in the {{ spec.standard | upper | escape }} table.</p>
 {%- endif %}{% endfor %}
 
 <p class="muted">Estimates from the cook.md nutrition service. Generic adult daily values, not personal medical advice.</p>
@@ -278,6 +285,8 @@ function validate(check: Check): void {
  * The spec is embedded as a dict literal. `JSON.stringify` with indentation puts
  * every closing brace on its own line, so `}}` never appears inside the
  * `{%- set spec = … -%}` statement.
+ *
+ * Throws when a check key/label is not plain text or the template would exceed the editor limit.
  */
 export function buildTemplate(spec: CheckSpec, mode: TemplateMode): string {
     spec.checks.forEach(validate);
@@ -334,7 +343,7 @@ export function parseVitalsOutput(output: string): VitalsOutput | undefined {
     }
     if (!isPlainObject(data) || (data.kind !== 'plan' && data.kind !== 'recipe') || !Array.isArray(data.rows)
         || !isFiniteNumber(data.days) || !isFiniteNumber(data.people) || typeof data.standard !== 'string' || !isFiniteNumber(data.tol)
-        || !isCount(data.matched) || !isCount(data.total)) {
+        || !isCount(data.matched) || !isCount(data.total) || data.matched > data.total) {
         return undefined;
     }
     const rows: VitalsRow[] = [];
