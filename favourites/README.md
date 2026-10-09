@@ -5,8 +5,7 @@ Mark recipes as favourites in Cook Editor. Ships with Cook Editor.
 ## What you see
 
 - A heart as the first button in a recipe preview's header: outline when the
-  recipe is not a favourite, filled orange when it is. Click to toggle. A
-  notification confirms it, with **Undo**.
+  recipe is not a favourite, filled orange when it is. Click to toggle.
 - **Add to Favourites** / **Remove from Favourites** when you right-click a
   `.cook` file in the Explorer, and **Favourites: Toggle Favourite** in the
   command palette for the recipe you are editing.

@@ -84,19 +84,6 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             .catch(reportError('Could not bind the workspace'));
     }));
 
-    const showToast = async (added: boolean, path: string): Promise<void> => {
-        const message = added ? 'Added to Favourites' : 'Removed from Favourites';
-        try {
-            const choice = await vscode.window.showInformationMessage(message, 'Undo');
-            if (choice === 'Undo') {
-                await (added ? store.remove(path) : store.add(path));
-            }
-        } catch (error) {
-            reportError('Undo failed')(error);
-            vscode.window.showErrorMessage(`Could not update .bookmarks: ${error instanceof Error ? error.message : String(error)}`);
-        }
-    };
-
     const run = async (action: Action, argument: unknown): Promise<void> => {
         if (!store.hasWorkspace()) {
             vscode.window.showInformationMessage(new NoWorkspaceError().message);
@@ -107,24 +94,15 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
             vscode.window.showInformationMessage('Open a recipe (.cook) to add it to Favourites.');
             return;
         }
+        // No confirmation toast: the heart in the preview and the Favourites view show the new state.
         try {
-            let nowFavourite: boolean;
             if (action === 'toggle') {
-                nowFavourite = await store.toggle(target.path);
+                await store.toggle(target.path);
             } else if (action === 'add') {
-                if (!await store.add(target.path)) {
-                    vscode.window.showInformationMessage('Already in Favourites');
-                    return;
-                }
-                nowFavourite = true;
+                await store.add(target.path);
             } else {
-                if (!await store.remove(target.path)) {
-                    vscode.window.showInformationMessage('Not in Favourites');
-                    return;
-                }
-                nowFavourite = false;
+                await store.remove(target.path);
             }
-            void showToast(nowFavourite, target.path);
         } catch (error) {
             if (error instanceof NoWorkspaceError) {
                 vscode.window.showInformationMessage(error.message);
