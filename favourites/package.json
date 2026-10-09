@@ -1,0 +1,141 @@
+{
+  "name": "favourites",
+  "displayName": "Favourites",
+  "description": "Heart on recipe previews and a Favourites view, stored in a plain-text .bookmarks file. Ships with Cook Editor.",
+  "version": "0.1.2",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cook-md/plugins.git",
+    "directory": "favourites"
+  },
+  "keywords": [
+    "cooklang",
+    "favourites",
+    "bookmarks",
+    "recipes"
+  ],
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "cooklang.favourites.add",
+        "title": "Add to Favourites",
+        "category": "Favourites",
+        "icon": {
+          "light": "media/heart-light.svg",
+          "dark": "media/heart-dark.svg"
+        }
+      },
+      {
+        "command": "cooklang.favourites.remove",
+        "title": "Remove from Favourites",
+        "category": "Favourites",
+        "icon": {
+          "light": "media/heart-filled.svg",
+          "dark": "media/heart-filled.svg"
+        }
+      },
+      {
+        "command": "cooklang.favourites.toggle",
+        "title": "Toggle Favourite",
+        "category": "Favourites"
+      },
+      {
+        "command": "cooklang.favourites.openRecipe",
+        "title": "Open Recipe",
+        "category": "Favourites"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "cooklang.favourites.add",
+          "when": "editorLangId == cooklang"
+        },
+        {
+          "command": "cooklang.favourites.remove",
+          "when": "editorLangId == cooklang"
+        },
+        {
+          "command": "cooklang.favourites.openRecipe",
+          "when": "false"
+        }
+      ],
+      "cooklang/recipePreview/toolbar": [
+        {
+          "command": "cooklang.favourites.add",
+          "when": "cooklangPreviewScheme == file && cooklangPreviewPath =~ /\\.cook$/i && cooklangPreviewPath not in cooklang.favourites.paths",
+          "group": "navigation@1"
+        },
+        {
+          "command": "cooklang.favourites.remove",
+          "when": "cooklangPreviewScheme == file && cooklangPreviewPath =~ /\\.cook$/i && cooklangPreviewPath in cooklang.favourites.paths",
+          "group": "navigation@1"
+        }
+      ],
+      "explorer/context": [
+        {
+          "command": "cooklang.favourites.add",
+          "when": "resourceExtname =~ /^\\.cook$/i && resource not in cooklang.favourites.uris",
+          "group": "navigation@80"
+        },
+        {
+          "command": "cooklang.favourites.remove",
+          "when": "resourceExtname =~ /^\\.cook$/i && resource in cooklang.favourites.uris",
+          "group": "navigation@80"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "cooklang.favourites.remove",
+          "when": "view == cooklang.favourites.view && viewItem == favourite",
+          "group": "inline"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "cooklang.favourites.view",
+          "name": "Favourites",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "cooklang.favourites.view",
+        "contents": "No favourites yet. Open a recipe and press the heart in its preview."
+      }
+    ]
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath favourites-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^22.20.4",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^4.0.0",
+    "mocha": "^12.0.2",
+    "ovsx": "^1.0.0",
+    "typescript": "~7.0.2"
+  }
+}
