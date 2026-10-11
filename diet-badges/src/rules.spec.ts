@@ -3,8 +3,8 @@ import { CategorySlug, DietIngredient, DietOutput } from './diet-template';
 import { DietVerdicts, NON_VEGAN_WORDS, evaluateDiets } from './rules';
 import { DIET_IDS } from './settings';
 
-const ing = (name: string, options: { categories?: CategorySlug[]; allergens?: string[]; unknown?: boolean } = {}): DietIngredient =>
-    ({ name, status: options.unknown ? 'unknown' : 'verified', allergenClasses: options.allergens ?? [], categories: options.categories ?? [] });
+const ing = (name: string, options: { categories?: CategorySlug[]; allergens?: string[]; unknown?: boolean; unclassified?: boolean } = {}): DietIngredient =>
+    ({ name, status: options.unknown ? 'unknown' : 'verified', classified: !options.unclassified, allergenClasses: options.allergens ?? [], categories: options.categories ?? [] });
 const output = (ingredients: DietIngredient[], extra: { refs?: string[]; missing?: string[] } = {}): DietOutput =>
     ({ names: ingredients.map(i => i.name), refs: extra.refs ?? [], missing: extra.missing ?? [], ingredients });
 /** Vegan, Vegetarian, Pescatarian, Dairy-free. */
