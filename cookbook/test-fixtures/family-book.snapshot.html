@@ -19,7 +19,11 @@ blockquote { border-left: 0.8mm solid #d8d8d0; margin: 3mm 0; padding-left: 4mm;
 .toc ul { list-style: none; padding-left: 0; margin: 0; }
 .toc ul ul { padding-left: 6mm; }
 .toc li { margin: 1.4mm 0; }
-.toc-chapter > a { font-weight: 600; }
+.toc-chapter > .toc-line { font-weight: 600; }
+.toc-line { display: flex; align-items: baseline; gap: 2mm; }
+.toc-dots { flex: 1 1 auto; min-width: 4mm; border-bottom: 0.3mm dotted #b5b5ae; }
+.toc [data-page-ref] { min-width: 8mm; text-align: right; font-variant-numeric: tabular-nums; }
+.index-entry [data-page-ref] { color: #6b6b66; font-variant-numeric: tabular-nums; }
 .chapter, .recipe, .index, .appendix { break-before: page; page-break-before: always; }
 .chapter-title + .recipe { break-before: auto; page-break-before: auto; }
 .chapter-title + .chapter:not(.has-intro) { break-before: auto; page-break-before: auto; }
@@ -60,7 +64,7 @@ h3, .section-name { break-after: avoid; page-break-after: avoid; }
 </section>
 <nav class="toc">
 <h1>Contents</h1>
-<ul><li class="toc-recipe"><a href="#r-2">Quick Toast</a></li><li class="toc-chapter"><a href="#c-1">Soups &amp; Stews</a><ul><li class="toc-recipe"><a href="#r-3">Tomato Soup</a></li></ul></li><li class="toc-chapter"><a href="#c-2">Breakfast</a><ul><li class="toc-recipe"><a href="#r-4">Fluffy Pancakes</a></li></ul></li><li class="toc-chapter"><a href="#c-3">Mains</a><ul><li class="toc-chapter"><a href="#c-4">Pasta</a><ul><li class="toc-recipe"><a href="#r-5">Carbonara</a></li></ul></li></ul></li><li class="toc-extra"><a href="#index">Index of ingredients</a></li><li class="toc-extra"><a href="#not-included">Not included</a></li></ul>
+<ul><li class="toc-recipe"><a class="toc-line" href="#r-2"><span class="toc-title">Quick Toast</span><span class="toc-dots"></span><span data-page-ref="r-2"></span></a></li><li class="toc-chapter"><a class="toc-line" href="#c-1"><span class="toc-title">Soups &amp; Stews</span><span class="toc-dots"></span><span data-page-ref="c-1"></span></a><ul><li class="toc-recipe"><a class="toc-line" href="#r-3"><span class="toc-title">Tomato Soup</span><span class="toc-dots"></span><span data-page-ref="r-3"></span></a></li></ul></li><li class="toc-chapter"><a class="toc-line" href="#c-2"><span class="toc-title">Breakfast</span><span class="toc-dots"></span><span data-page-ref="c-2"></span></a><ul><li class="toc-recipe"><a class="toc-line" href="#r-4"><span class="toc-title">Fluffy Pancakes</span><span class="toc-dots"></span><span data-page-ref="r-4"></span></a></li></ul></li><li class="toc-chapter"><a class="toc-line" href="#c-3"><span class="toc-title">Mains</span><span class="toc-dots"></span><span data-page-ref="c-3"></span></a><ul><li class="toc-chapter"><a class="toc-line" href="#c-4"><span class="toc-title">Pasta</span><span class="toc-dots"></span><span data-page-ref="c-4"></span></a><ul><li class="toc-recipe"><a class="toc-line" href="#r-5"><span class="toc-title">Carbonara</span><span class="toc-dots"></span><span data-page-ref="r-5"></span></a></li></ul></li></ul></li><li class="toc-extra"><a class="toc-line" href="#index"><span class="toc-title">Index of ingredients</span><span class="toc-dots"></span><span data-page-ref="index"></span></a></li><li class="toc-extra"><a class="toc-line" href="#not-included"><span class="toc-title">Not included</span><span class="toc-dots"></span><span data-page-ref="not-included"></span></a></li></ul>
 </nav>
 <article class="recipe" id="r-2">
 <h2 class="recipe-title">Quick Toast</h2>
@@ -124,27 +128,27 @@ h3, .section-name { break-after: avoid; page-break-after: avoid; }
 <h1>Index of ingredients</h1>
 <div class="index-columns">
 <h2 class="index-letter">B</h2>
-<p class="index-entry"><span class="index-name">bread</span> <a href="#r-2">Quick Toast</a></p>
-<p class="index-entry"><span class="index-name">butter</span> <a href="#r-4">Fluffy Pancakes</a>, <a href="#r-2">Quick Toast</a></p>
+<p class="index-entry"><span class="index-name">bread</span> <a href="#r-2">Quick Toast</a> <span data-page-ref="r-2"></span></p>
+<p class="index-entry"><span class="index-name">butter</span> <a href="#r-4">Fluffy Pancakes</a> <span data-page-ref="r-4"></span>, <a href="#r-2">Quick Toast</a> <span data-page-ref="r-2"></span></p>
 <h2 class="index-letter">E</h2>
-<p class="index-entry"><span class="index-name">egg</span> <a href="#r-5">Carbonara</a>, <a href="#r-4">Fluffy Pancakes</a></p>
+<p class="index-entry"><span class="index-name">egg</span> <a href="#r-5">Carbonara</a> <span data-page-ref="r-5"></span>, <a href="#r-4">Fluffy Pancakes</a> <span data-page-ref="r-4"></span></p>
 <h2 class="index-letter">F</h2>
-<p class="index-entry"><span class="index-name">flour</span> <a href="#r-4">Fluffy Pancakes</a></p>
+<p class="index-entry"><span class="index-name">flour</span> <a href="#r-4">Fluffy Pancakes</a> <span data-page-ref="r-4"></span></p>
 <h2 class="index-letter">G</h2>
-<p class="index-entry"><span class="index-name">garlic</span> <a href="#r-3">Tomato Soup</a></p>
-<p class="index-entry"><span class="index-name">guanciale</span> <a href="#r-5">Carbonara</a></p>
+<p class="index-entry"><span class="index-name">garlic</span> <a href="#r-3">Tomato Soup</a> <span data-page-ref="r-3"></span></p>
+<p class="index-entry"><span class="index-name">guanciale</span> <a href="#r-5">Carbonara</a> <span data-page-ref="r-5"></span></p>
 <h2 class="index-letter">M</h2>
-<p class="index-entry"><span class="index-name">milk</span> <a href="#r-4">Fluffy Pancakes</a></p>
+<p class="index-entry"><span class="index-name">milk</span> <a href="#r-4">Fluffy Pancakes</a> <span data-page-ref="r-4"></span></p>
 <h2 class="index-letter">O</h2>
-<p class="index-entry"><span class="index-name">olive oil</span> <a href="#r-3">Tomato Soup</a></p>
-<p class="index-entry"><span class="index-name">onion</span> <a href="#r-3">Tomato Soup</a></p>
+<p class="index-entry"><span class="index-name">olive oil</span> <a href="#r-3">Tomato Soup</a> <span data-page-ref="r-3"></span></p>
+<p class="index-entry"><span class="index-name">onion</span> <a href="#r-3">Tomato Soup</a> <span data-page-ref="r-3"></span></p>
 <h2 class="index-letter">P</h2>
-<p class="index-entry"><span class="index-name">pecorino</span> <a href="#r-5">Carbonara</a></p>
+<p class="index-entry"><span class="index-name">pecorino</span> <a href="#r-5">Carbonara</a> <span data-page-ref="r-5"></span></p>
 <h2 class="index-letter">S</h2>
-<p class="index-entry"><span class="index-name">salt</span> <a href="#r-3">Tomato Soup</a></p>
-<p class="index-entry"><span class="index-name">spaghetti</span> <a href="#r-5">Carbonara</a></p>
+<p class="index-entry"><span class="index-name">salt</span> <a href="#r-3">Tomato Soup</a> <span data-page-ref="r-3"></span></p>
+<p class="index-entry"><span class="index-name">spaghetti</span> <a href="#r-5">Carbonara</a> <span data-page-ref="r-5"></span></p>
 <h2 class="index-letter">T</h2>
-<p class="index-entry"><span class="index-name">tomato</span> <a href="#r-3">Tomato Soup</a></p>
+<p class="index-entry"><span class="index-name">tomato</span> <a href="#r-3">Tomato Soup</a> <span data-page-ref="r-3"></span></p>
 </div>
 </section>
 <section class="appendix" id="not-included">

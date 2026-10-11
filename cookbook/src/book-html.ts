@@ -90,7 +90,11 @@ blockquote { border-left: 0.8mm solid #d8d8d0; margin: 3mm 0; padding-left: 4mm;
 .toc ul { list-style: none; padding-left: 0; margin: 0; }
 .toc ul ul { padding-left: 6mm; }
 .toc li { margin: 1.4mm 0; }
-.toc-chapter > a { font-weight: 600; }
+.toc-chapter > .toc-line { font-weight: 600; }
+.toc-line { display: flex; align-items: baseline; gap: 2mm; }
+.toc-dots { flex: 1 1 auto; min-width: 4mm; border-bottom: 0.3mm dotted #b5b5ae; }
+.toc [data-page-ref] { min-width: 8mm; text-align: right; font-variant-numeric: tabular-nums; }
+.index-entry [data-page-ref] { color: #6b6b66; font-variant-numeric: tabular-nums; }
 .chapter, .recipe, .index, .appendix { break-before: page; page-break-before: always; }
 .chapter-title + .recipe { break-before: auto; page-break-before: auto; }
 .chapter-title + .chapter:not(.has-intro) { break-before: auto; page-break-before: auto; }
@@ -123,10 +127,23 @@ h3, .section-name { break-after: avoid; page-break-after: avoid; }
 `.trim();
 }
 
+/**
+ * A contents line: title, dot leader and an empty page-number placeholder that
+ * `cooklang.api.exportPdf` fills (`pageNumbers: true`) with the page `#id` starts on.
+ */
+function tocLine(id: string, title: string): string {
+    return `<a class="toc-line" href="#${id}"><span class="toc-title">${escapeHtml(title)}</span><span class="toc-dots"></span>${pageRef(id)}</a>`;
+}
+
+/** Placeholder for the page number of `#id`; the editor only fills this exact form. */
+function pageRef(id: string): string {
+    return `<span data-page-ref="${id}"></span>`;
+}
+
 function tocRecipes(entries: readonly { path: string }[], recipes: ReadonlyMap<string, RenderedRecipe>): string[] {
     return entries.flatMap(entry => {
         const recipe = recipes.get(entry.path);
-        return recipe ? [`<li class="toc-recipe"><a href="#${recipe.id}">${escapeHtml(recipe.title)}</a></li>`] : [];
+        return recipe ? [`<li class="toc-recipe">${tocLine(recipe.id, recipe.title)}</li>`] : [];
     });
 }
 
@@ -139,7 +156,7 @@ export function buildBookHtml(input: BookHtmlInput): string {
     const tocChapter = (chapter: Chapter): string => {
         const children = [...tocRecipes(chapter.recipes, recipes), ...chapter.chapters.map(tocChapter)];
         const list = children.length > 0 ? `<ul>${children.join('')}</ul>` : '';
-        return `<li class="toc-chapter"><a href="#${chapterId.get(chapter.path)}">${escapeHtml(chapter.title)}</a>${list}</li>`;
+        return `<li class="toc-chapter">${tocLine(chapterId.get(chapter.path)!, chapter.title)}${list}</li>`;
     };
 
     const chapterHtml = (chapter: Chapter): string => {
@@ -159,8 +176,8 @@ export function buildBookHtml(input: BookHtmlInput): string {
     const toc = [
         ...tocRecipes(tree.recipes, recipes),
         ...tree.chapters.map(tocChapter),
-        ...(input.index.length > 0 ? ['<li class="toc-extra"><a href="#index">Index of ingredients</a></li>'] : []),
-        ...(input.notIncluded.length > 0 ? ['<li class="toc-extra"><a href="#not-included">Not included</a></li>'] : []),
+        ...(input.index.length > 0 ? [`<li class="toc-extra">${tocLine('index', 'Index of ingredients')}</li>`] : []),
+        ...(input.notIncluded.length > 0 ? [`<li class="toc-extra">${tocLine('not-included', 'Not included')}</li>`] : []),
     ];
 
     const parts: string[] = [
@@ -196,7 +213,7 @@ export function buildBookHtml(input: BookHtmlInput): string {
                 letter = group;
                 parts.push(`<h2 class="index-letter">${escapeHtml(group)}</h2>`);
             }
-            const links = entry.recipes.map(recipe => `<a href="#${recipe.id}">${escapeHtml(recipe.title)}</a>`).join(', ');
+            const links = entry.recipes.map(recipe => `<a href="#${recipe.id}">${escapeHtml(recipe.title)}</a> ${pageRef(recipe.id)}`).join(', ');
             parts.push(`<p class="index-entry"><span class="index-name">${escapeHtml(entry.name)}</span> ${links}</p>`);
         }
         parts.push('</div>', '</section>');

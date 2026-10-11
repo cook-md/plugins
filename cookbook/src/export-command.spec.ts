@@ -178,6 +178,7 @@ describe('CookbookExporter', () => {
         const args = exported()!;
         assert.strictEqual(args.defaultFileName, 'Family Book.pdf');
         assert.strictEqual(args.pageSize, 'A4');
+        assert.strictEqual(args.pageNumbers, true);
         assert.ok(args.html.includes('<h1 class="book-title">Family: Book</h1>'));
         assert.ok(args.html.includes('<p class="generated">Generated on 10 October 2026</p>'));
         assert.ok(args.html.includes('<a href="#r-2">Tomato</a>'));

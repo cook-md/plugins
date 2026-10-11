@@ -100,7 +100,7 @@ describe('buildBookHtml', () => {
             recipes: new Map([['top.cook', recipe('r-1', 'top.cook', 'Top')], ['A/a.cook', recipe('r-2', 'A/a.cook', 'A & B')]]),
             notIncluded: [{ path: 'A/gone.cook', reason: 'Template error: <bad>' }],
         }));
-        assert.ok(html.includes('<ul><li class="toc-recipe"><a href="#r-1">Top</a></li><li class="toc-chapter"><a href="#c-1">A</a><ul><li class="toc-recipe"><a href="#r-2">A &amp; B</a></li></ul></li><li class="toc-extra"><a href="#not-included">Not included</a></li></ul>'));
+        assert.ok(html.includes('<ul><li class="toc-recipe"><a class="toc-line" href="#r-1"><span class="toc-title">Top</span><span class="toc-dots"></span><span data-page-ref="r-1"></span></a></li><li class="toc-chapter"><a class="toc-line" href="#c-1"><span class="toc-title">A</span><span class="toc-dots"></span><span data-page-ref="c-1"></span></a><ul><li class="toc-recipe"><a class="toc-line" href="#r-2"><span class="toc-title">A &amp; B</span><span class="toc-dots"></span><span data-page-ref="r-2"></span></a></li></ul></li><li class="toc-extra"><a class="toc-line" href="#not-included"><span class="toc-title">Not included</span><span class="toc-dots"></span><span data-page-ref="not-included"></span></a></li></ul>'));
         assert.ok(html.includes('<section class="chapter depth-1" id="c-1">\n<h1 class="chapter-title">A</h1>\n<article class="recipe" id="r-2">A & B</article>\n</section>'));
         assert.ok(html.includes('<li><code>A/gone.cook</code>: Template error: &lt;bad&gt;</li>'));
         assert.ok(!html.includes('id="index"'));
@@ -110,9 +110,9 @@ describe('buildBookHtml', () => {
         const html = buildBookHtml(input({
             index: [{ name: '7up', recipes: [{ id: 'r-1', title: 'Fizz' }] }, { name: 'apple', recipes: [{ id: 'r-1', title: 'Fizz' }, { id: 'r-2', title: 'Pie' }] }],
         }));
-        assert.ok(html.includes('<h2 class="index-letter">#</h2>\n<p class="index-entry"><span class="index-name">7up</span> <a href="#r-1">Fizz</a></p>\n<h2 class="index-letter">A</h2>'));
-        assert.ok(html.includes('<span class="index-name">apple</span> <a href="#r-1">Fizz</a>, <a href="#r-2">Pie</a>'));
-        assert.ok(html.includes('<li class="toc-extra"><a href="#index">Index of ingredients</a></li>'));
+        assert.ok(html.includes('<h2 class="index-letter">#</h2>\n<p class="index-entry"><span class="index-name">7up</span> <a href="#r-1">Fizz</a> <span data-page-ref="r-1"></span></p>\n<h2 class="index-letter">A</h2>'));
+        assert.ok(html.includes('<span class="index-name">apple</span> <a href="#r-1">Fizz</a> <span data-page-ref="r-1"></span>, <a href="#r-2">Pie</a> <span data-page-ref="r-2"></span>'));
+        assert.ok(html.includes('<li class="toc-extra"><a class="toc-line" href="#index"><span class="toc-title">Index of ingredients</span><span class="toc-dots"></span><span data-page-ref="index"></span></a></li>'));
     });
 
     it('groups accented names under their base letter', () => {

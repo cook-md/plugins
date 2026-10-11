@@ -217,7 +217,7 @@ export class CookbookExporter {
                     throw new Error(TOO_LARGE_MESSAGE);
                 }
                 report('Creating the PDF…');
-                const saved = await this.api.exportPdf({ html, defaultFileName: pdfFileName(tree.title), pageSize: settings.pageSize });
+                const saved = await this.api.exportPdf({ html, defaultFileName: pdfFileName(tree.title), pageSize: settings.pageSize, pageNumbers: true });
                 unavailable = nutrition.unavailable;
                 return { saved, notIncluded: notIncluded.length };
             });

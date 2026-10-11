@@ -39,6 +39,8 @@ export interface ExportPdfArgs {
     html: string;
     defaultFileName: string;
     pageSize: PageSize;
+    /** Number the pages and fill `<span data-page-ref="ID"></span>` placeholders. */
+    pageNumbers?: boolean;
 }
 
 export interface ExportPdfResult {
