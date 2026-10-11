@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>The Family Book</title>
+<style>
+@page { size: A4; margin: 18mm 16mm 20mm; }
+html { font-size: 11pt; }
+body { margin: 0; color: #1d1d1b; background: #fff; font-family: 'Iowan Old Style', 'Palatino Linotype', Palatino, Georgia, serif; line-height: 1.45; }
+h1, h2, h3, h4, .meta, .step-number, .toc, .index-letter, .generated { font-family: -apple-system, 'Segoe UI', Helvetica, Arial, sans-serif; }
+a { color: inherit; text-decoration: none; }
+img { max-width: 100%; }
+blockquote { border-left: 0.8mm solid #d8d8d0; margin: 3mm 0; padding-left: 4mm; color: #4a4a45; }
+.cover { position: relative; height: 252mm; display: flex; flex-direction: column; justify-content: center; text-align: center; break-after: page; page-break-after: always; }
+.book-title { font-size: 34pt; line-height: 1.15; margin: 0 0 10mm; }
+.cover-intro { max-width: 130mm; margin: 0 auto; text-align: left; }
+.generated { position: absolute; left: 0; right: 0; bottom: 0; margin: 0; font-size: 9pt; color: #6b6b66; }
+.toc h1 { font-size: 24pt; margin: 0 0 8mm; }
+.toc ul { list-style: none; padding-left: 0; margin: 0; }
+.toc ul ul { padding-left: 6mm; }
+.toc li { margin: 1.4mm 0; }
+.toc-chapter > a { font-weight: 600; }
+.chapter, .recipe, .index, .appendix { break-before: page; page-break-before: always; }
+.chapter-title { font-size: 26pt; margin: 30mm 0 8mm; }
+.depth-2 > .chapter-title { font-size: 21pt; }
+.depth-3 > .chapter-title { font-size: 17pt; }
+.recipe-title { font-size: 20pt; margin: 0 0 4mm; }
+.title-image { display: block; width: 100%; max-height: 110mm; object-fit: cover; margin: 0 0 4mm; border-radius: 2mm; }
+.meta, .source, .tags, .nutrition { font-size: 9.5pt; color: #4a4a45; margin: 1mm 0; }
+.tag { border: 0.3mm solid #c9c9c2; border-radius: 3mm; padding: 0 2mm; }
+.nutrition { font-weight: 600; }
+h3 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.06em; margin: 6mm 0 2mm; }
+.section-name { font-size: 11pt; margin: 4mm 0 2mm; }
+.ingredients { break-inside: avoid; page-break-inside: avoid; }
+.ingredients ul, .cookware ul { columns: 2; column-gap: 8mm; padding-left: 4mm; margin: 0; }
+.qty { font-weight: 600; }
+.note, .optional { color: #6b6b66; }
+.optional { font-style: italic; font-size: 9pt; }
+.text { font-style: italic; color: #4a4a45; }
+.step { position: relative; padding-left: 9mm; margin: 0 0 2.5mm; break-inside: avoid; page-break-inside: avoid; }
+.step-number { position: absolute; left: 0; top: 0; font-weight: 700; }
+.step p { margin: 0; }
+.step-image { display: block; max-width: 60%; margin: 2mm 0 0; border-radius: 1.5mm; }
+.index-columns { columns: 2; column-gap: 10mm; font-size: 9.5pt; }
+.index-letter { font-size: 12pt; margin: 4mm 0 1mm; break-after: avoid; page-break-after: avoid; }
+.index-entry { margin: 0.6mm 0; break-inside: avoid; page-break-inside: avoid; }
+.index-name { font-weight: 600; }
+.appendix code { font-size: 9pt; }
+</style>
+</head>
+<body>
+<section class="cover">
+<h1 class="book-title">The Family Book</h1>
+<div class="cover-intro"><p>Recipes we <strong>actually</strong> cook, kept in plain text.</p>
+<blockquote><p>Cook with whatever is in the fridge.</p></blockquote></div>
+<p class="generated">Generated on 10 October 2026</p>
+</section>
+<nav class="toc">
+<h1>Contents</h1>
+<ul><li class="toc-recipe"><a href="#r-2">Quick Toast</a></li><li class="toc-chapter"><a href="#c-1">Soups &amp; Stews</a><ul><li class="toc-recipe"><a href="#r-3">Tomato Soup</a></li></ul></li><li class="toc-chapter"><a href="#c-2">Breakfast</a><ul><li class="toc-recipe"><a href="#r-4">Fluffy Pancakes</a></li></ul></li><li class="toc-chapter"><a href="#c-3">Mains</a><ul><li class="toc-chapter"><a href="#c-4">Pasta</a><ul><li class="toc-recipe"><a href="#r-5">Carbonara</a></li></ul></li></ul></li><li class="toc-extra"><a href="#index">Index of ingredients</a></li><li class="toc-extra"><a href="#not-included">Not included</a></li></ul>
+</nav>
+<article class="recipe" id="r-2">
+<h2 class="recipe-title">Quick Toast</h2>
+<p class="meta">Serves 1</p>
+<section class="ingredients"><h3>Ingredients</h3><ul><li><span class="qty">2 slices</span> bread</li><li><span class="qty">10 g</span> butter</li></ul></section>
+<section class="method"><h3>Method</h3>
+<div class="step"><span class="step-number">1</span><p>Toast 2 slices bread and spread with 10 g butter.</p></div>
+</section>
+</article>
+<section class="chapter depth-1" id="c-1">
+<h1 class="chapter-title">Soups &amp; Stews</h1>
+<div class="intro"><h2>Why soup</h2>
+<p>Cheap, warm and forgiving. See <a href="https://cooklang.org">Cooklang</a> for the format.</p>
+<ul><li>freezes well</li><li>better the next day</li></ul></div>
+<article class="recipe" id="r-3">
+<h2 class="recipe-title">Tomato Soup</h2>
+<p class="meta">Serves 4 · Prep 10 min · Cook 30 min</p>
+<p class="source">Source: <a href="https://example.com/soup">Grandma</a></p>
+<p class="nutrition">Per serving: 180 kcal · 4 g protein · 20 g carbs · 9 g fat</p>
+<section class="ingredients"><h3>Ingredients</h3><ul><li><span class="qty">1</span> onion <span class="note">(diced)</span></li><li><span class="qty">2 cloves</span> garlic</li><li><span class="qty">2 tbsp</span> olive oil</li><li><span class="qty">800 g</span> tomatoes</li><li>salt</li></ul></section>
+<section class="cookware"><h3>Cookware</h3><ul><li>pot</li></ul></section>
+<section class="method"><h3>Method</h3>
+<p class="text">A family favourite.</p>
+<div class="step"><span class="step-number">1</span><p>Chop 1 onion and 2 cloves garlic.</p></div>
+<div class="step"><span class="step-number">2</span><p>Fry in pot with 2 tbsp olive oil, add 800 g tomatoes and simmer for 25 minutes.</p></div>
+<h4 class="section-name">Finish</h4>
+<div class="step"><span class="step-number">1</span><p>Blend with salt until smooth.</p></div>
+</section>
+</article>
+</section>
+<section class="chapter depth-1" id="c-2">
+<h1 class="chapter-title">Breakfast</h1>
+<article class="recipe" id="r-4">
+<h2 class="recipe-title">Fluffy Pancakes</h2>
+<p class="meta">Serves 4 · Total 25 min</p>
+<p class="tags"><span class="tag">breakfast</span> <span class="tag">sweet</span></p>
+<section class="ingredients"><h3>Ingredients</h3><ul><li><span class="qty">2</span> eggs</li><li><span class="qty">300 ml</span> milk</li><li><span class="qty">200 g</span> flour</li><li>butter <span class="optional">optional</span></li></ul></section>
+<section class="cookware"><h3>Cookware</h3><ul><li>bowl</li><li>frying pan</li></ul></section>
+<section class="method"><h3>Method</h3>
+<div class="step"><span class="step-number">1</span><p>Whisk 2 eggs, 300 ml milk and 200 g flour in a bowl.</p></div>
+<div class="step"><span class="step-number">2</span><p>Fry ladlefuls in a frying pan with butter for 2 minutes a side.</p></div>
+</section>
+</article>
+</section>
+<section class="chapter depth-1" id="c-3">
+<h1 class="chapter-title">Mains</h1>
+<section class="chapter depth-2" id="c-4">
+<h2 class="chapter-title">Pasta</h2>
+<article class="recipe" id="r-5">
+<h2 class="recipe-title">Carbonara</h2>
+<p class="meta">Serves 2</p>
+<section class="ingredients"><h3>Ingredients</h3><ul><li><span class="qty">200 g</span> spaghetti</li><li><span class="qty">2</span> eggs</li><li><span class="qty">50 g</span> pecorino</li><li><span class="qty">100 g</span> guanciale</li></ul></section>
+<section class="method"><h3>Method</h3>
+<div class="step"><span class="step-number">1</span><p>Boil 200 g spaghetti in salted water.</p></div>
+<div class="step"><span class="step-number">2</span><p>Mix 2 eggs with 50 g pecorino and toss with the pasta and 100 g guanciale.</p></div>
+</section>
+</article>
+</section>
+</section>
+<section class="index" id="index">
+<h1>Index of ingredients</h1>
+<div class="index-columns">
+<h2 class="index-letter">B</h2>
+<p class="index-entry"><span class="index-name">bread</span> <a href="#r-2">Quick Toast</a></p>
+<p class="index-entry"><span class="index-name">butter</span> <a href="#r-4">Fluffy Pancakes</a>, <a href="#r-2">Quick Toast</a></p>
+<h2 class="index-letter">E</h2>
+<p class="index-entry"><span class="index-name">egg</span> <a href="#r-5">Carbonara</a>, <a href="#r-4">Fluffy Pancakes</a></p>
+<h2 class="index-letter">F</h2>
+<p class="index-entry"><span class="index-name">flour</span> <a href="#r-4">Fluffy Pancakes</a></p>
+<h2 class="index-letter">G</h2>
+<p class="index-entry"><span class="index-name">garlic</span> <a href="#r-3">Tomato Soup</a></p>
+<p class="index-entry"><span class="index-name">guanciale</span> <a href="#r-5">Carbonara</a></p>
+<h2 class="index-letter">M</h2>
+<p class="index-entry"><span class="index-name">milk</span> <a href="#r-4">Fluffy Pancakes</a></p>
+<h2 class="index-letter">O</h2>
+<p class="index-entry"><span class="index-name">olive oil</span> <a href="#r-3">Tomato Soup</a></p>
+<p class="index-entry"><span class="index-name">onion</span> <a href="#r-3">Tomato Soup</a></p>
+<h2 class="index-letter">P</h2>
+<p class="index-entry"><span class="index-name">pecorino</span> <a href="#r-5">Carbonara</a></p>
+<h2 class="index-letter">S</h2>
+<p class="index-entry"><span class="index-name">salt</span> <a href="#r-3">Tomato Soup</a></p>
+<p class="index-entry"><span class="index-name">spaghetti</span> <a href="#r-5">Carbonara</a></p>
+<h2 class="index-letter">T</h2>
+<p class="index-entry"><span class="index-name">tomato</span> <a href="#r-3">Tomato Soup</a></p>
+</div>
+</section>
+<section class="appendix" id="not-included">
+<h1>Not included</h1>
+<p>These recipes could not be rendered. Open each one in Cook Editor to see what is wrong.</p>
+<ul><li><code>Broken.cook</code>: syntax error: unexpected end of input</li></ul>
+</section>
+</body>
+</html>
