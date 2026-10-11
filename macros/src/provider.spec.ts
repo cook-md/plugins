@@ -98,6 +98,15 @@ describe('MacrosBadgeProvider', () => {
         assert.deepStrictEqual(fixture.renders, [{ uri: MENU.uri, template: MACROS_TEMPLATE, scale: 1 }]);
     });
 
+    it('divides a menu by fractional people × days', async () => {
+        const fixture = new Fixture();
+        fixture.results = [{ ok: true, output: JSON.stringify({ kind: 'plan', aggregate: aggregate(5), days: 2, people: 2.5, missingRecipes: [] }) }];
+        const badge = await fixture.provider().provide(MENU);
+        // 5 × (152P 208C 56F) / (2.5 × 2) = 152P 208C 56F
+        assert.strictEqual(badge?.text, '152P 208C 56F /day');
+        assert.ok(badge?.tooltipMarkdown.includes('Per person per day (2.5 people × 2 days)'));
+    });
+
     it('uses the per-100 g basis from the settings', async () => {
         const fixture = new Fixture();
         fixture.settings = { ...fixture.settings, basis: '100g' };

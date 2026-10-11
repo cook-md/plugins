@@ -46,7 +46,7 @@ export interface PlanOutput {
     aggregate: NutritionAggregate;
     /** Sections of the menu (`= Day … =`), at least 1. */
     days: number;
-    /** The menu's numeric `servings:` frontmatter, at least 1. */
+    /** The menu's numeric `servings:` frontmatter, at least 1 (may be fractional). */
     people: number;
     /** Recipe references the engine could not expand; their ingredients are missing from the totals. */
     missingRecipes: string[];
@@ -113,8 +113,13 @@ function isNutritionFailure(value: unknown): value is NutritionFailure {
     return isPlainObject(value) && typeof value.ingredient === 'string';
 }
 
-function isCountAtLeastOne(value: unknown): value is number {
+function isDayCount(value: unknown): value is number {
     return isFiniteNumber(value) && Number.isInteger(value) && value >= 1;
+}
+
+/** People may be fractional (`servings: 2.5`), as in Core Vitals. */
+function isPeopleCount(value: unknown): value is number {
+    return isFiniteNumber(value) && value >= 1;
 }
 
 /**
@@ -154,7 +159,7 @@ export function parseMacrosOutput(output: string): MacrosOutput | undefined {
     if (data.kind === 'recipe') {
         return { kind: 'recipe', aggregate };
     }
-    if (data.kind !== 'plan' || !isCountAtLeastOne(data.days) || !isCountAtLeastOne(data.people) || !Array.isArray(data.missingRecipes)) {
+    if (data.kind !== 'plan' || !isDayCount(data.days) || !isPeopleCount(data.people) || !Array.isArray(data.missingRecipes)) {
         return undefined;
     }
     const missingRecipes = data.missingRecipes.filter((name): name is string => typeof name === 'string');

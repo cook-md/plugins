@@ -36,10 +36,15 @@ describe('parseMacrosOutput', () => {
         assert.deepStrictEqual(data && data.kind === 'plan' ? [data.days, data.people, data.missingRecipes] : undefined, [7, 2, ['Curry']]);
     });
 
-    it('rejects a plan with a non-positive or fractional day or people count', () => {
-        for (const bad of [{ days: 0, people: 2 }, { days: 7, people: 0 }, { days: 1.5, people: 2 }, { days: 7, people: '2' }]) {
+    it('rejects a plan with a non-positive or fractional day count, or a people count below 1 or not a number', () => {
+        for (const bad of [{ days: 0, people: 2 }, { days: 7, people: 0 }, { days: 7, people: 0.5 }, { days: 1.5, people: 2 }, { days: 7, people: '2' }]) {
             assert.strictEqual(parseMacrosOutput(JSON.stringify({ kind: 'plan', aggregate, missingRecipes: [], ...bad })), undefined);
         }
+    });
+
+    it('accepts fractional people on a plan', () => {
+        const data = parseMacrosOutput(JSON.stringify({ kind: 'plan', aggregate, days: 2, people: 2.5, missingRecipes: [] }));
+        assert.strictEqual(data?.kind === 'plan' ? data.people : undefined, 2.5);
     });
 
     it('rejects output that is not the template result', () => {
