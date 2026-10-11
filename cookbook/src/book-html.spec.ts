@@ -115,6 +115,17 @@ describe('buildBookHtml', () => {
         assert.ok(html.includes('<li class="toc-extra"><a href="#index">Index of ingredients</a></li>'));
     });
 
+    it('groups accented names under their base letter', () => {
+        const entry = (name: string) => ({ name, recipes: [{ id: 'r-1', title: 'T' }] });
+        const html = buildBookHtml(input({ index: [entry('apple'), entry('äpfel'), entry('egg'), entry('élan'), entry('łosoś')] }));
+        const letters = [...html.matchAll(/<h2 class="index-letter">([^<]*)<\/h2>/g)].map(match => match[1]);
+        assert.deepStrictEqual(letters, ['A', 'E', 'Ł']);
+    });
+
+    it('scopes the uppercase headings to recipes', () => {
+        assert.ok(bookCss('A4').includes('.recipe h3 { font-size: 11pt;'));
+    });
+
     it('escapes the title and the generated date', () => {
         const html = buildBookHtml(input({ tree: tree(['README.md', 'a.cook'], { 'README.md': '---\ntitle: <Ours>\n---\n' }), generatedOn: '<today>' }));
         assert.ok(html.includes('<title>&lt;Ours&gt;</title>'));

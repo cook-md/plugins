@@ -103,7 +103,7 @@ blockquote { border-left: 0.8mm solid #d8d8d0; margin: 3mm 0; padding-left: 4mm;
 .tag { border: 0.3mm solid #c9c9c2; border-radius: 3mm; padding: 0 2mm; }
 .nutrition { font-weight: 600; }
 h3, .section-name { break-after: avoid; page-break-after: avoid; }
-h3 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.06em; margin: 6mm 0 2mm; }
+.recipe h3 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.06em; margin: 6mm 0 2mm; }
 .section-name { font-size: 11pt; margin: 4mm 0 2mm; }
 .ingredients { break-inside: avoid; page-break-inside: avoid; }
 .ingredients ul, .cookware ul { columns: 2; column-gap: 8mm; padding-left: 6mm; margin: 0; }
@@ -189,8 +189,8 @@ export function buildBookHtml(input: BookHtmlInput): string {
         parts.push('<section class="index" id="index">', '<h1>Index of ingredients</h1>', '<div class="index-columns">');
         let letter = '';
         for (const entry of input.index) {
-            const first = entry.name.charAt(0).toUpperCase();
-            const group = /[A-Z]/.test(first) ? first : '#';
+            const first = entry.name.normalize('NFD').charAt(0).toUpperCase();
+            const group = /\p{L}/u.test(first) ? first : '#';
             if (group !== letter) {
                 letter = group;
                 parts.push(`<h2 class="index-letter">${escapeHtml(group)}</h2>`);

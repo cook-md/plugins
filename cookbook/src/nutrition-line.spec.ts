@@ -34,6 +34,13 @@ describe('servingsFromMetadata', () => {
         assert.strictEqual(servingsFromMetadata({ yield: '2|4' }), 2);
     });
 
+    it('falls through to the next key when a value has no number, and normalises key separators', () => {
+        assert.strictEqual(servingsFromMetadata({ servings: 'a few', yield: '3 portions' }), 3);
+        assert.strictEqual(servingsFromMetadata({ Servings: 'many', serves: 6 }), 6);
+        assert.strictEqual(servingsFromMetadata({ 'Serves': 2 }), 2);
+        assert.strictEqual(servingsFromMetadata({ servings: 'few', yield: 'lots' }), undefined);
+    });
+
     it('is undefined when absent, non-numeric or out of range', () => {
         assert.strictEqual(servingsFromMetadata({}), undefined);
         assert.strictEqual(servingsFromMetadata({ servings: 'a few' }), undefined);

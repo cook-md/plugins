@@ -59,13 +59,13 @@ export function parseNutritionOutput(output: string): NutritionSummary | undefin
 /** `servings`, `serves` or `yield` metadata (any case) as a whole number 1–1000: `4`, `"4"`, `"4 people"`. */
 export function servingsFromMetadata(metadata: Record<string, unknown>): number | undefined {
     for (const [key, value] of Object.entries(metadata)) {
-        if (!/^(servings|serves|yield)$/i.test(key)) {
+        if (!/^(servings|serves|yield)$/.test(key.toLowerCase().replace(/[_-]/g, ' ').trim())) {
             continue;
         }
         const match = typeof value === 'number' ? String(value) : typeof value === 'string' ? value.trim() : '';
         const leading = /^(\d+)/.exec(match);
         if (!leading) {
-            return undefined;
+            continue;
         }
         const servings = Number.parseInt(leading[1], 10);
         return servings >= 1 && servings <= MAX_SERVINGS ? servings : undefined;
