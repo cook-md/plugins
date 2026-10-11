@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { ImageFiles, ImageInliner, lookupStepImage, mimeType, toDataUri } from './images';
+import { ImageFiles, ImageInliner, MAX_IMAGE_BYTES, MAX_TOTAL_IMAGE_CHARS, lookupStepImage, mimeType, toDataUri } from './images';
 
 function files(contents: Record<string, Uint8Array>): ImageFiles & { reads: string[] } {
     const reads: string[] = [];
@@ -97,6 +97,36 @@ describe('ImageInliner', () => {
         const retry = new ImageInliner(failing, 1000, one + 5);
         assert.strictEqual(await retry.inline('file:///b/bad.jpg'), undefined);
         assert.ok(await retry.inline('file:///b/good.jpg'));
+    });
+
+    it('charges the budget for every use of a shared photo but reads it once', async () => {
+        const fs = files({ 'file:///b/shared.jpg': new Uint8Array(30) });
+        const one = toDataUri(new Uint8Array(30), 'image/jpeg').length;
+        const inliner = new ImageInliner(fs, 1000, one * 3 + 1);
+        const results = await Promise.all([1, 2, 3, 4, 5].map(() => inliner.inline('file:///b/shared.jpg')));
+        assert.strictEqual(results.filter(result => result !== undefined).length, 3);
+        assert.strictEqual(inliner.skipped, 2);
+        assert.deepStrictEqual(fs.reads, ['file:///b/shared.jpg']);
+        assert.strictEqual(await inliner.inline('file:///b/shared.jpg'), undefined);
+        assert.strictEqual(inliner.skipped, 3);
+    });
+
+    it('drops a file that turns out bigger than the cap after the read, and clears its cache', async () => {
+        const grown: ImageFiles = { size: async () => 3, read: async () => new Uint8Array(20) };
+        const inliner = new ImageInliner(grown, 10, 1000);
+        assert.strictEqual(await inliner.inline('file:///b/a.jpg'), undefined);
+        assert.strictEqual(inliner.skipped, 1);
+        const fs = files({ 'file:///b/a.png': new Uint8Array([1]) });
+        const again = new ImageInliner(fs);
+        await again.inline('file:///b/a.png');
+        again.clear();
+        await again.inline('file:///b/a.png');
+        assert.strictEqual(fs.reads.length, 2);
+    });
+
+    it('keeps the whole book under 50 MiB of images', () => {
+        assert.strictEqual(MAX_TOTAL_IMAGE_CHARS, 50 * 1024 * 1024);
+        assert.strictEqual(MAX_IMAGE_BYTES, 10 * 1024 * 1024);
     });
 
     it('inlines a whole RecipeImages result and drops what it cannot inline', async () => {

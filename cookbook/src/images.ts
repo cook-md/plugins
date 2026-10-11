@@ -7,10 +7,12 @@ export const MAX_IMAGE_BYTES = 10 * 1024 * 1024;
 
 /**
  * All inlined images together, in data-URI characters. The editor rejects export
- * HTML over 100 M characters; this leaves room for the text. Images past the budget
- * are left out and counted in {@link ImageInliner.skipped}.
+ * HTML over 100 M characters, and the plugin → backend → frontend → Electron path has
+ * only been tested up to about 60 MB, so the images get 50 MiB and the text the rest.
+ * Every use of a photo counts, shared ones included, because each is embedded again.
+ * Images past the budget are left out and counted in {@link ImageInliner.skipped}.
  */
-export const MAX_TOTAL_IMAGE_CHARS = 80 * 1024 * 1024;
+export const MAX_TOTAL_IMAGE_CHARS = 50 * 1024 * 1024;
 
 /** The extensions the editor's preview understands (`common/recipe-images.ts`). */
 export const IMAGE_MIME_TYPES: Readonly<Record<string, string>> = {
@@ -51,7 +53,7 @@ export class ImageInliner {
     /** Images left out because they were too big or over the book's budget. */
     skipped = 0;
     protected used = 0;
-    protected readonly cache = new Map<string, Promise<string | undefined>>();
+    protected readonly cache = new Map<string, Promise<Loaded>>();
 
     constructor(
         protected readonly files: ImageFiles,
@@ -59,17 +61,36 @@ export class ImageInliner {
         protected readonly budget = MAX_TOTAL_IMAGE_CHARS,
     ) { }
 
-    /** `http(s)` URLs as they are; readable image files as data URIs; anything else undefined. Each URI is read once. */
-    inline(uri: string): Promise<string | undefined> {
+    /**
+     * `http(s)` URLs as they are; readable image files as data URIs; anything else undefined.
+     * Each file is read once, but every use is charged to the budget.
+     */
+    async inline(uri: string): Promise<string | undefined> {
         if (/^https?:\/\/\S+$/i.test(uri)) {
-            return Promise.resolve(uri);
+            return uri;
         }
         let pending = this.cache.get(uri);
-        if (!pending) {
-            pending = this.load(uri);
-            this.cache.set(uri, pending);
+        if (pending) {
+            const loaded = await pending;
+            if (loaded.dataUri !== undefined) {
+                if (this.used + loaded.dataUri.length > this.budget) {
+                    this.skipped++;
+                    return undefined;
+                }
+                this.used += loaded.dataUri.length;
+            } else if (loaded.skipped) {
+                this.skipped++;
+            }
+            return loaded.dataUri;
         }
-        return pending;
+        pending = this.load(uri);
+        this.cache.set(uri, pending);
+        return (await pending).dataUri;
+    }
+
+    /** Forget the cached data URIs (they are large) once the book is assembled. */
+    clear(): void {
+        this.cache.clear();
     }
 
     async inlineAll(images: RecipeImages): Promise<RecipeImages> {
@@ -91,34 +112,46 @@ export class ImageInliner {
         return result;
     }
 
-    protected async load(uri: string): Promise<string | undefined> {
+    protected async load(uri: string): Promise<Loaded> {
         const mime = mimeType(uri);
         if (!mime || !/^[a-z][a-z0-9+.-]*:/i.test(uri)) {
-            return undefined;
+            return { skipped: false };
         }
         try {
             const size = await this.files.size(uri);
             if (size === undefined) {
-                return undefined;
+                return { skipped: false };
             }
             // Base64 is 4 characters per 3 bytes, plus the `data:<mime>;base64,` prefix. The budget
             // is checked and reserved in one synchronous step, so concurrent loads can't all pass.
             const reserved = Math.ceil(size / 3) * 4 + `data:${mime};base64,`.length;
             if (size > this.maxBytes || this.used + reserved > this.budget) {
                 this.skipped++;
-                return undefined;
+                return { skipped: true };
             }
             this.used += reserved;
             try {
-                const dataUri = toDataUri(await this.files.read(uri), mime);
+                const bytes = await this.files.read(uri);
+                if (bytes.length > this.maxBytes) {
+                    this.used -= reserved;
+                    this.skipped++;
+                    return { skipped: true };
+                }
+                const dataUri = toDataUri(bytes, mime);
                 this.used += dataUri.length - reserved;
-                return dataUri;
+                return { dataUri, skipped: false };
             } catch (error) {
                 this.used -= reserved;
                 throw error;
             }
         } catch {
-            return undefined;
+            return { skipped: false };
         }
     }
+}
+
+interface Loaded {
+    dataUri?: string;
+    /** Left out for size or budget, as opposed to missing or unreadable. */
+    skipped: boolean;
 }
