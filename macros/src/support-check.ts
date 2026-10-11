@@ -1,3 +1,4 @@
+// Copied from corevitals/src/support-check.ts; keep in sync.
 import { CooklangApi, SUPPORTED_API_VERSION } from './cooklang-api';
 
 /**

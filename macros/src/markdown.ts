@@ -1,3 +1,4 @@
+// Copied from corevitals/src/markdown.ts; keep in sync.
 const MAX_LIST_ENTRIES = 8;
 const MAX_NAME_LENGTH = 60;
 

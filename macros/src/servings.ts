@@ -1,3 +1,4 @@
+// Copied from corevitals/src/servings.ts; keep in sync.
 /** Servings above this are treated as unknown (almost certainly a typo). */
 export const MAX_SERVINGS = 1000;
 
