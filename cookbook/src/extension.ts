@@ -93,28 +93,32 @@ function toBookFolder(uri: vscode.Uri): BookFolder {
     return { uri: uri.toString(), name };
 }
 
-/** Command palette: choose among the workspace's folders that contain recipes. */
+/** Command palette: choose among the folders of every workspace root that contain recipes. */
 async function pickFolder(exclude: readonly string[]): Promise<BookFolder | undefined> {
-    const root = vscode.workspace.workspaceFolders?.[0];
-    if (!root) {
+    const roots = vscode.workspace.workspaceFolders ?? [];
+    if (roots.length === 0) {
         void vscode.window.showInformationMessage('Open a recipe folder to export a cookbook.');
         return undefined;
     }
-    const recipes = await vscode.workspace.findFiles(new vscode.RelativePattern(root, '**/*.cook'), SKIPPED);
-    const choices = folderChoices(recipes.map(uri => path.posix.relative(root.uri.path, uri.path)), exclude);
+    const choices: Array<{ label: string; description: string | undefined; root: vscode.WorkspaceFolder; relative: string }> = [];
+    for (const root of roots) {
+        const recipes = await vscode.workspace.findFiles(new vscode.RelativePattern(root, '**/*.cook'), SKIPPED);
+        for (const relative of folderChoices(recipes.map(uri => path.posix.relative(root.uri.path, uri.path)), exclude)) {
+            const name = relative === '' ? root.name : roots.length > 1 ? `${root.name}/${relative}` : relative;
+            choices.push({ label: name, description: relative === '' ? 'Whole workspace folder' : undefined, root, relative });
+        }
+    }
     if (choices.length === 0) {
         void vscode.window.showInformationMessage('No recipes to export in this workspace.');
         return undefined;
     }
-    const picked = await vscode.window.showQuickPick(
-        choices.map(relative => ({ label: relative === '' ? root.name : relative, description: relative === '' ? 'Whole workspace' : undefined, relative })),
-        { placeHolder: 'Folder to export as a cookbook' },
-    );
+    const picked = await vscode.window.showQuickPick(choices, { placeHolder: 'Folder to export as a cookbook' });
     if (!picked) {
         return undefined;
     }
-    const uri = picked.relative === '' ? root.uri : vscode.Uri.joinPath(root.uri, ...picked.relative.split('/'));
-    return { uri: uri.toString(), name: picked.relative === '' ? root.name : path.posix.basename(picked.relative) };
+    const { root, relative } = picked;
+    const uri = relative === '' ? root.uri : vscode.Uri.joinPath(root.uri, ...relative.split('/'));
+    return { uri: uri.toString(), name: relative === '' ? root.name : path.posix.basename(relative) };
 }
 
 export function deactivate(): void {

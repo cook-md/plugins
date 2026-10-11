@@ -45,7 +45,7 @@ Family Recipes/
   alphabetically. Without a `title`, the cover uses the README's first `#`
   heading, then the folder name. READMEs support headings, paragraphs, bold and
   italic, inline code, lists, quotes, rules, `https` links and images next to
-  the README.
+  the README. An image inside a link (`[![alt](a.jpg)](https://…)`) is not supported.
 - **Recipe titles** come from the recipe's `title` metadata, else the file name.
 - **Photos** follow the same rules as the recipe preview: `Pancakes.jpg` under
   the title, `Pancakes.1.jpg` (or `image:` metadata) for steps. Photos over 10 MB
