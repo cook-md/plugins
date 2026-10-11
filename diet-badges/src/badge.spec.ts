@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import {
-    FOOTER, LOCKED_TEXT, LOCKED_TOOLTIP, MAX_PILL_TEXT, UNREACHABLE_LINE, UNREACHABLE_TEXT,
-    dietBadge, lockedBadge, pillText, unreachableBadge,
+    FOOTER, LOCKED_TEXT, LOCKED_TOOLTIP, MAX_PILL_TEXT, UNAVAILABLE_LINE, UNAVAILABLE_TEXT, UNREACHABLE_LINE, UNREACHABLE_TEXT,
+    dietBadge, lockedBadge, pillText, unavailableBadge, unreachableBadge,
 } from './badge';
 import { DietStatus, DietVerdict, DietVerdicts, Violation } from './rules';
 import { DietId } from './settings';
@@ -133,5 +133,12 @@ describe('fixed pills', () => {
         });
         assert.strictEqual(UNREACHABLE_TEXT, 'Diet ?');
         assert.ok(UNREACHABLE_LINE.startsWith("Couldn't reach the nutrition service"));
+    });
+
+    it('unavailable: amber Diet ? saying the check is unavailable', () => {
+        assert.deepStrictEqual(unavailableBadge(), {
+            kind: 'pill', text: UNAVAILABLE_TEXT, tone: 'warning', tooltipMarkdown: ['**Diet**', UNAVAILABLE_LINE, FOOTER].join('\n\n'),
+        });
+        assert.ok(UNAVAILABLE_LINE.startsWith('The diet check is unavailable'));
     });
 });

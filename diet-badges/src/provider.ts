@@ -1,4 +1,4 @@
-import { dietBadge, lockedBadge, unreachableBadge } from './badge';
+import { dietBadge, lockedBadge, unavailableBadge, unreachableBadge } from './badge';
 import { CooklangApi, PillBadge, PluginReportResult, PreviewOutletContext } from './cooklang-api';
 import { DIET_TEMPLATE, DietOutput, parseDietOutput } from './diet-template';
 import { evaluateDiets } from './rules';
@@ -45,6 +45,15 @@ export class DietBadgeProvider {
         if (!isPreviewContext(context)) {
             return undefined;
         }
+        try {
+            return await this.provideBadge(context);
+        } catch (error) {
+            this.logOnce('error', String(error));
+            return unavailableBadge();
+        }
+    }
+
+    protected async provideBadge(context: PreviewOutletContext): Promise<PillBadge | undefined> {
         const settings = this.settings();
         if (isInactive(settings)) {
             return undefined;
@@ -66,7 +75,7 @@ export class DietBadgeProvider {
         const output = parseDietOutput(result.output);
         if (!output) {
             this.logOnce('output', 'unexpected template output');
-            return undefined;
+            return unavailableBadge();
         }
         this.logged.clear();
         const badge = isEmpty(output) ? undefined : dietBadge(evaluateDiets(output, settings.extraNonVegan), settings.diets);
@@ -87,7 +96,9 @@ export class DietBadgeProvider {
             case 'server':
                 return unreachableBadge();
             default:
-                return undefined;
+                // A template error (e.g. a category slug the service no longer knows) must not
+                // look like "this recipe fits no diet": say the check didn't happen.
+                return unavailableBadge();
         }
     }
 
@@ -96,8 +107,9 @@ export class DietBadgeProvider {
     }
 
     /**
-     * Only open recipes are cached: a menu's verdict depends on the recipes it references,
-     * whose edits don't change the menu's version.
+     * Only open recipes are cached here. A menu's verdict depends on the recipes it references,
+     * whose edits don't change the menu's own version, so this cache couldn't tell when it went
+     * stale. (The editor's render cache keys menus on their own text only, so it can lag the same way.)
      */
     protected cacheKey(uri: string, settings: DietSettings): string | undefined {
         if (isMenuUri(uri)) {

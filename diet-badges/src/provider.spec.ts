@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { LOCKED_TEXT, UNREACHABLE_TEXT } from './badge';
+import { LOCKED_TEXT, UNAVAILABLE_LINE, UNAVAILABLE_TEXT, UNREACHABLE_TEXT } from './badge';
 import { CooklangApi, PluginReportResult } from './cooklang-api';
 import { DIET_TEMPLATE } from './diet-template';
 import { DietBadgeProvider, isMenuUri } from './provider';
@@ -97,15 +97,26 @@ describe('DietBadgeProvider', () => {
         }
     });
 
-    it('shows nothing on a template error or malformed output, logging each reason once', async () => {
+    it('shows an amber unavailable pill on a template error or malformed output, logging each reason once', async () => {
         const s = setup({ results: [fail('template', 'bad'), fail('template', 'bad'), { ok: true, output: 'nope' }, TOFU, fail('template', 'bad')] });
-        assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
-        assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
-        assert.strictEqual(await s.provider.provide(CONTEXT), undefined);
+        for (let i = 0; i < 3; i += 1) {
+            const badge = await s.provider.provide(CONTEXT);
+            assert.deepStrictEqual([badge?.text, badge?.tone], [UNAVAILABLE_TEXT, 'warning']);
+            assert.ok(badge?.tooltipMarkdown.includes(UNAVAILABLE_LINE));
+        }
         assert.deepStrictEqual(s.logs, ['Diet badges unavailable (template): bad', 'Diet badges unavailable (output): unexpected template output']);
         await s.provider.provide(CONTEXT);
         await s.provider.provide(CONTEXT);
         assert.strictEqual(s.logs.length, 3, 'a good render clears the log-once memory');
+    });
+
+    it('shows the unavailable pill, instead of throwing, when anything unexpected goes wrong', async () => {
+        const logs: string[] = [];
+        const api = new CooklangApi(async () => { throw new Error('kaput'); }, async () => []);
+        const provider = new DietBadgeProvider(api, message => logs.push(message), () => readSettings(() => undefined));
+        assert.strictEqual((await provider.provide(CONTEXT))?.text, UNAVAILABLE_TEXT);
+        assert.deepStrictEqual(logs.length, 1);
+        assert.ok(logs[0].includes('kaput'));
     });
 
     it('shows nothing for an empty recipe', async () => {

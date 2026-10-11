@@ -26,6 +26,9 @@ Sign in to cook.md with a Cook Basic or Pro plan to see which diets your recipes
 export const UNREACHABLE_TEXT = 'Diet ?';
 export const UNREACHABLE_LINE = "Couldn't reach the nutrition service, so no diet could be checked.";
 
+export const UNAVAILABLE_TEXT = 'Diet ?';
+export const UNAVAILABLE_LINE = 'The diet check is unavailable right now, so no diet could be checked. See the Diet Badges output for details.';
+
 type EnabledDiets = Readonly<Record<DietId, boolean>>;
 
 /** The strictest enabled ladder diet that didn't fail, plus Dairy-free when it didn't fail and Vegan isn't shown. */
@@ -109,4 +112,8 @@ export function lockedBadge(): PillBadge {
 
 export function unreachableBadge(): PillBadge {
     return { kind: 'pill', text: UNREACHABLE_TEXT, tone: 'warning', tooltipMarkdown: ['**Diet**', UNREACHABLE_LINE, FOOTER].join('\n\n') };
+}
+
+export function unavailableBadge(): PillBadge {
+    return { kind: 'pill', text: UNAVAILABLE_TEXT, tone: 'warning', tooltipMarkdown: ['**Diet**', UNAVAILABLE_LINE, FOOTER].join('\n\n') };
 }
