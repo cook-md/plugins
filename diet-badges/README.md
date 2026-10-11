@@ -30,7 +30,11 @@ Each word applies to the diet it breaks and every stricter one, so lard fails Pe
 
 Ingredient categories and allergen data come from the cook.md nutrition service. Word matching is on whole words, and plurals match both ways.
 
-**What counts as checked.** An ingredient's allergens being audited does not say whether it is meat, and the service's categories come from food-group data that not every ingredient has (branded and some regional items have none). For Pescatarian, Vegetarian and Vegan, an ingredient therefore counts as checked only when it matched an animal category or sits in a plant-only group (vegetables, fruits, grains, legumes, nuts and seeds, herbs and spices, vegetable oil, sugar, beverages). Anything else is "couldn't be checked" unless a word above already rules it out. Dairy-free relies on the audited allergens.
+**What counts as checked.** An ingredient's allergens being audited does not say whether it is meat, and the service's categories come from food-group data that not every ingredient has (branded and some regional items have none). For Pescatarian, Vegetarian and Vegan, an ingredient therefore counts as checked only when it matched an animal category or sits in a plant-only group (vegetables, fruits, grains, legumes, nuts and seeds, herbs and spices, vegetable oil, sugar, beverages). Anything else is "couldn't be checked" unless a word above already rules it out. `beverages` counts as plant-based for Vegetarian and Pescatarian but not for Vegan, because wine and beer can be fined with animal products. Dairy-free relies on the audited allergens.
+
+Classification uses an ingredient's main food group, so composite items (for example canned beans with pork) can slip through. Diet Badges is informational only.
+
+**Look-alikes.** Names such as `beef tomatoes`, `lamb's lettuce` and `chicken of the woods` are not treated as meat. A meat or fish word next to a substitute marker (vegan, vegetarian, plant-based, meat-free, mock, faux, imitation, `-style`, tofu, tempeh, seitan, soy, coconut, mushroom, jackfruit) such as `vegan sausage` or `coconut bacon` counts as "couldn't be checked", never as a pass. Categories and allergens still decide first.
 
 ## Recipes and meal plans
 
