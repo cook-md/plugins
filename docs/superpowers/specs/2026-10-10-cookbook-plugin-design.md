@@ -13,7 +13,6 @@
 
 ## Non-goals
 
-- Page numbers in the TOC / index (Chromium `printToPDF` can't resolve them; we use PDF links instead).
 - Layout themes or custom CSS (v1 has one tasteful layout; a `cookbook.css` override is a possible v2).
 - EPUB or other formats.
 - Menus (`.menu` files are skipped).
@@ -48,7 +47,7 @@ One `renderReport` call per recipe with an HTML-producing Jinja template (`recip
 `book-html.ts` assembles one HTML document with print CSS (A4 default, setting `cookbook.pageSize`: `A4` | `Letter`):
 
 1. **Cover:** root README title (first `#` heading or frontmatter `title`, else folder name) and body; else folder name only. Generated date at the bottom.
-2. **Contents:** chapters and recipes as `<a href="#id">` links (internal PDF links).
+2. **Contents:** chapters and recipes as `<a href="#id">` links (internal PDF links), each with a dot leader and its page number. Pages are numbered in the footer; the index lists the page after each recipe link. Numbers come from `cooklang.api.exportPdf`'s `pageNumbers: true` (added 2026-10-11 after the first demo: the editor reads where each anchor landed from the first PDF pass and fills `<span data-page-ref="id"></span>` placeholders in a second pass).
 3. **Chapters:** `page-break-before: always`; heading, intro (README), then each recipe (`page-break-before: always` per recipe, `break-inside: avoid` on the ingredient list).
 4. **Index of ingredients:** alphabetical, normalised names (lowercase, simple plural stripped), each listing recipe titles as links. Recipe references excluded.
 
