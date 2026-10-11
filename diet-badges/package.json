@@ -47,7 +47,7 @@
         },
         "dietBadges.extraNonVegan": {
           "type": "array", "items": { "type": "string" }, "default": [], "order": 5,
-          "description": "Other words that make a recipe not vegan (e.g. bone broth), matched against ingredient names on whole words. Plurals match both ways."
+          "description": "Other words that make a recipe not vegan (e.g. bone broth), matched against ingredient names on whole words. Plurals match both ways. Affects Vegan only; Vegetarian and Pescatarian use a built-in list."
         },
         "dietBadges.showWhenLocked": {
           "type": "boolean", "default": true, "order": 6,

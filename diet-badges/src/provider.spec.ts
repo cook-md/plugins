@@ -9,7 +9,7 @@ const CONTEXT = { version: 1, uri: 'file:///ws/a.cook', path: 'a.cook', scale: 2
 const MENU = { version: 1, uri: 'file:///ws/week.menu', path: 'week.menu', scale: 1 };
 
 const verified = (...classes: string[]) => ({ status: 'verified', view: 'eu', contains: classes.map(c => ({ class: c, label: c })) });
-const item = (ingredient: string, categories: string[] = [], allergens: unknown = verified()) => ({ ingredient, allergens, warnings: [], categories });
+const item = (ingredient: string, categories: string[] = [], allergens: unknown = verified()) => ({ ingredient, allergens, warnings: [], categories, plant: categories.length === 0 });
 const out = (fields: { names?: string[]; refs?: string[]; missing?: string[]; items?: unknown[]; failures?: unknown[] }): PluginReportResult => ({
     ok: true,
     output: JSON.stringify({ names: fields.names ?? [], refs: fields.refs ?? [], missing: fields.missing ?? [], items: fields.items ?? [], failures: fields.failures ?? [] }),

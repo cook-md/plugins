@@ -22,17 +22,17 @@ describe('a captured /aggregate response (EU view)', () => {
         ]);
     });
 
-    it('fails Vegan and Dairy-free on butter and leaves the rest unknown', () => {
+    it('fails Vegan and Dairy-free on butter and leaves the rest unknown (soy sauce is audited but unclassified)', () => {
         const verdicts = evaluateDiets(output!, []);
         assert.deepStrictEqual(DIET_IDS.map(id => verdicts[id].status), ['fail', 'unknown', 'unknown', 'fail']);
         assert.deepStrictEqual(verdicts.vegan.violations, [{ ingredient: 'butter', reason: 'dairy' }]);
-        assert.deepStrictEqual(verdicts.vegetarian.unknown, ['plain flour', 'saffron', 'unobtainium']);
+        assert.deepStrictEqual(verdicts.vegetarian.unknown, ['plain flour', 'saffron', 'unobtainium', 'soy sauce']);
     });
 
     it('shows an amber Vegetarian? pill explaining both failures', () => {
         const badge = dietBadge(evaluateDiets(output!, []), { vegan: true, vegetarian: true, pescatarian: true, dairyFree: true });
         assert.deepStrictEqual([badge?.text, badge?.tone], ['Vegetarian?', 'warning']);
-        assert.ok(badge?.tooltipMarkdown.includes("- **Vegetarian?** 3 ingredients couldn't be checked: plain flour, saffron, unobtainium"), badge?.tooltipMarkdown);
+        assert.ok(badge?.tooltipMarkdown.includes("- **Vegetarian?** 4 ingredients couldn't be checked: plain flour, saffron, unobtainium, soy sauce"), badge?.tooltipMarkdown);
         assert.ok(badge?.tooltipMarkdown.includes('- Not vegan: butter \\(dairy\\)'));
         assert.ok(badge?.tooltipMarkdown.includes('- Not dairy-free: butter \\(dairy\\)'));
     });
