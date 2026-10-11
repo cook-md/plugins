@@ -99,6 +99,12 @@ describe('computeMacros', () => {
         assert.deepStrictEqual(result.missingRecipes, ['Curry']);
     });
 
+    it('names the missing recipes even when no ingredient could be evaluated at all', () => {
+        const empty: NutritionAggregate = { items: [], failures: [], totals: { mass_g: 0, macros: times(MACROS, 0) } };
+        const plan: MacrosOutput = { kind: 'plan', aggregate: empty, days: 1, people: 1, missingRecipes: ['Does Not Exist'] };
+        assert.strictEqual(computeMacros(plan, { basis: 'serving', servings: undefined, scale: 1 }).withheld, 'missingRecipes');
+    });
+
     it('withholds figures when there is nothing to evaluate', () => {
         const empty: NutritionAggregate = { items: [], failures: [], totals: { mass_g: 0, macros: times(MACROS, 0) } };
         assert.strictEqual(computeMacros(recipe(empty), { basis: 'serving', servings: 4, scale: 1 }).withheld, 'noData');

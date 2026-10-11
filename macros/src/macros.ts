@@ -103,10 +103,10 @@ export function computeMacros(output: MacrosOutput, options: MacrosOptions): Mac
     const missingRecipes = output.kind === 'plan' ? output.missingRecipes : [];
     const totals = output.aggregate.totals;
     let withheld: WithheldReason | undefined;
-    if (match.total === 0) {
-        withheld = 'noData';
-    } else if (missingRecipes.length > 0) {
+    if (missingRecipes.length > 0) {
         withheld = 'missingRecipes';
+    } else if (match.total === 0) {
+        withheld = 'noData';
     } else if (!isConfident(match)) {
         withheld = 'unmatched';
     } else if (portion.kind === '100g' && !(totals.mass_g > 0)) {
