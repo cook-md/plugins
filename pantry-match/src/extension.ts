@@ -72,7 +72,8 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
     );
 
     await syncShoppingList().catch(error => log(`Pantry Match: ${messageOf(error)}`));
-    await controller.start().catch(error => log(`Pantry Match: start failed: ${messageOf(error)}`));
+    // Not awaited: the first scan renders every recipe and must not block Theia's onStartupFinished.
+    void controller.start().catch(error => log(`Pantry Match: start failed: ${messageOf(error)}`));
 }
 
 export function deactivate(): void {

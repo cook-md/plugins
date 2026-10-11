@@ -8,18 +8,21 @@ import { expiringItems, todayString } from './expiry';
 import { PantryLookup, pantryLookup } from './match';
 import { RecipeNames, renderNames } from './names-template';
 import { loadPantry, PANTRY_FILE, PantryState } from './pantry-file';
-import { RecipeFile, RecipeIndex } from './recipe-index';
+import { mapInBatches, RecipeFile, RecipeIndex } from './recipe-index';
 import { ReferenceExpander } from './references';
 import { PantryMatchSettings, readSettings } from './settings';
+import { SupportCheck } from './support-check';
 import { PantryMatchTreeProvider, VIEW_ID } from './tree';
+import { blockedState, planUpdate, resultState, ViewState } from './update-plan';
 import { buildViewModel, EMPTY_MODEL, FailedRecipe, IndexedRecipe, isEmptyModel, TreeNode, ViewModel } from './view-model';
 
 export const STATE_CONTEXT_KEY = 'pantryMatch.state';
-export type ViewState = 'noWorkspace' | 'unsupported' | 'noPantry' | 'pantryError' | 'indexing' | 'empty' | 'ready';
+export { ViewState };
 
 const RECIPE_GLOB = '**/*.cook';
 const EXCLUDE_GLOB = '{**/node_modules/**,**/.git/**}';
 const DEBOUNCE_MS = 300;
+const REFERENCE_BATCH = 10;
 
 function messageOf(error: unknown): string {
     return error instanceof Error ? error.message : String(error);
@@ -36,14 +39,20 @@ export class PantryMatchController implements vscode.Disposable {
     protected watchers: vscode.Disposable[] = [];
     protected pantry: PantryState = { kind: 'missing' };
     protected lookup: PantryLookup | undefined;
-    protected supported: Promise<boolean> | undefined;
+    protected readonly support: SupportCheck;
     /** The workspace is only scanned once the view has been shown (or Refresh was pressed). */
     protected viewed = false;
     protected pantryChanged = true;
     protected timer: ReturnType<typeof setTimeout> | undefined;
+    /** Badges must be re-queried (a recipe changed, so previews linking to it may differ). */
+    protected badgesDirty = false;
+    protected disposed = false;
     protected queue: Promise<void> = Promise.resolve();
+    /** An update that is queued but hasn't started; further requests share it. */
+    protected waiting: Promise<void> | undefined;
 
     constructor(protected readonly api: CooklangApi, protected readonly log: (message: string) => void) {
+        this.support = new SupportCheck(() => api.supported());
         this.index = new RecipeIndex({
             list: () => this.listRecipes(),
             mtime: uri => this.mtime(uri),
@@ -88,8 +97,7 @@ export class PantryMatchController implements vscode.Disposable {
     }
 
     isSupported(): Promise<boolean> {
-        this.supported ??= this.api.supported();
-        return this.supported;
+        return this.support.isSupported();
     }
 
     async start(): Promise<void> {
@@ -120,6 +128,7 @@ export class PantryMatchController implements vscode.Disposable {
     }
 
     dispose(): void {
+        this.disposed = true;
         clearTimeout(this.timer);
         this.watchers.forEach(disposable => disposable.dispose());
         this.disposables.forEach(disposable => disposable.dispose());
@@ -144,9 +153,14 @@ export class PantryMatchController implements vscode.Disposable {
         const recipes = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, RECIPE_GLOB));
         const onRecipe = (uri: vscode.Uri): void => {
             this.index.invalidate(uri.toString());
-            // A changed recipe can change any tree it is linked from.
-            this.expander.clear();
+            this.expander.invalidate(vscode.workspace.asRelativePath(uri, false).replace(/\\/g, '/'));
+            this.badgesDirty = true;
             this.scheduleUpdate();
+        };
+        // A new or removed recipe can change which references resolve, in trees that don't mention it.
+        const onRecipeAddedOrRemoved = (uri: vscode.Uri): void => {
+            this.expander.clear();
+            onRecipe(uri);
         };
         const pantry = vscode.workspace.createFileSystemWatcher(new vscode.RelativePattern(folder, PANTRY_FILE));
         const onPantry = (): void => {
@@ -154,7 +168,7 @@ export class PantryMatchController implements vscode.Disposable {
             this.scheduleUpdate();
         };
         this.watchers = [
-            recipes, recipes.onDidCreate(onRecipe), recipes.onDidChange(onRecipe), recipes.onDidDelete(onRecipe),
+            recipes, recipes.onDidCreate(onRecipeAddedOrRemoved), recipes.onDidChange(onRecipe), recipes.onDidDelete(onRecipeAddedOrRemoved),
             pantry, pantry.onDidCreate(onPantry), pantry.onDidChange(onPantry), pantry.onDidDelete(onPantry),
         ];
     }
@@ -164,55 +178,82 @@ export class PantryMatchController implements vscode.Disposable {
         this.timer = setTimeout(() => { void this.enqueue(); }, delay);
     }
 
-    /** Updates run one at a time, in order. */
+    /** Updates run one at a time; a request while one is already waiting to start shares it. */
     protected enqueue(): Promise<void> {
-        this.queue = this.queue
-            .then(() => this.update())
+        if (this.waiting) {
+            return this.waiting;
+        }
+        const run = this.queue
+            .then(() => {
+                this.waiting = undefined;
+                return this.update();
+            })
             .catch(error => this.log(`Pantry Match: update failed: ${messageOf(error)}`));
-        return this.queue;
+        this.waiting = run;
+        this.queue = run;
+        return run;
     }
 
     protected async update(): Promise<void> {
-        const folder = this.folder();
-        if (!folder) {
-            this.lookup = undefined;
-            this.show(EMPTY_MODEL, undefined);
-            await this.setState('noWorkspace');
+        if (this.disposed) {
             return;
         }
-        if (!await this.isSupported()) {
+        const folder = this.folder();
+        const blocked = blockedState(folder !== undefined, folder === undefined || await this.isSupported());
+        if (this.disposed) {
+            return;
+        }
+        if (blocked || !folder) {
             this.lookup = undefined;
             this.show(EMPTY_MODEL, undefined);
-            await this.setState('unsupported');
+            await this.setState(blocked ?? 'noWorkspace');
             return;
         }
         if (this.pantryChanged) {
             this.pantryChanged = false;
+            this.badgesDirty = true;
             this.pantry = await loadPantry({ read: () => this.readPantry(folder.uri), parse: text => this.api.parsePantry(text) });
+            if (this.disposed) {
+                return;
+            }
             this.lookup = this.pantry.kind === 'ok' ? pantryLookup(this.pantry.items, this.settings().alwaysHave) : undefined;
+        }
+        if (this.badgesDirty) {
+            this.badgesDirty = false;
             await this.api.refreshBadges().catch(() => false);
+            if (this.disposed) {
+                return;
+            }
         }
         const pantry = this.pantry;
-        if (pantry.kind === 'missing') {
-            this.show(EMPTY_MODEL, undefined);
-            await this.setState('noPantry');
+        const plan = planUpdate(pantry.kind, this.viewed, this.index.size() === 0);
+        if (plan.action === 'show-empty') {
+            this.show(EMPTY_MODEL, plan.pantryMessage && pantry.kind === 'error' ? pantry.message : undefined);
+            await this.setState(plan.state);
             return;
         }
-        if (pantry.kind === 'error') {
-            this.show(EMPTY_MODEL, pantry.message);
-            await this.setState('pantryError');
+        if (plan.action === 'idle' || pantry.kind !== 'ok') {
             return;
         }
-        if (!this.viewed) {
+        if (plan.announceIndexing) {
+            await this.setState('indexing');
+        }
+        try {
+            await this.index.refresh((done, total) => {
+                this.treeView.message = done < total ? `Reading recipes… ${done}/${total}` : undefined;
+            });
+        } finally {
+            this.treeView.message = undefined;
+        }
+        if (this.disposed) {
             return;
         }
-        await this.setState('indexing');
-        await this.index.refresh((done, total) => {
-            this.treeView.message = done < total ? `Reading recipes… ${done}/${total}` : undefined;
-        });
         const model = await this.buildModel(pantry.items);
+        if (this.disposed) {
+            return;
+        }
         this.show(model, undefined);
-        await this.setState(isEmptyModel(model) ? 'empty' : 'ready');
+        await this.setState(resultState(isEmptyModel(model)));
     }
 
     protected async buildModel(items: readonly PantryItem[]): Promise<ViewModel> {
@@ -222,13 +263,17 @@ export class PantryMatchController implements vscode.Disposable {
         }
         const recipes: IndexedRecipe[] = [];
         const failed: FailedRecipe[] = [];
-        for (const entry of this.index.entries()) {
-            if (entry.result.ok) {
-                recipes.push({ uri: entry.uri, path: entry.path, ingredients: await this.expander.ingredientsFor(entry.path, entry.result.names) });
-            } else {
+        const entries = this.index.entries();
+        const ingredients = await mapInBatches(entries, REFERENCE_BATCH, entry =>
+            entry.result.ok ? this.expander.ingredientsFor(entry.path, entry.result.names) : Promise.resolve(undefined));
+        entries.forEach((entry, i) => {
+            const own = ingredients[i];
+            if (entry.result.ok && own) {
+                recipes.push({ uri: entry.uri, path: entry.path, ingredients: own });
+            } else if (!entry.result.ok) {
                 failed.push({ uri: entry.uri, path: entry.path, message: entry.result.message });
             }
-        }
+        });
         const expiring = expiringItems(items, todayString(new Date()), this.settings().expiringWithinDays);
         return buildViewModel(recipes, failed, lookup, expiring);
     }
