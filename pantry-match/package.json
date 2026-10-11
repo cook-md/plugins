@@ -1,0 +1,192 @@
+{
+  "name": "pantry-match",
+  "displayName": "Pantry Match",
+  "description": "What can I cook? Ranks your recipes by what's already in your pantry and suggests recipes for pantry items that expire soon. Free, works signed out.",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cook-md/plugins.git",
+    "directory": "pantry-match"
+  },
+  "keywords": [
+    "cooklang",
+    "pantry",
+    "recipes",
+    "meal-planning",
+    "what can I cook"
+  ],
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "pantryMatch.refresh",
+        "title": "Refresh",
+        "category": "Pantry Match",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "pantryMatch.openRecipe",
+        "title": "Open Recipe",
+        "category": "Pantry Match"
+      },
+      {
+        "command": "pantryMatch.addMissingToShoppingList",
+        "title": "Add missing to shopping list",
+        "category": "Pantry Match"
+      },
+      {
+        "command": "pantryMatch.setUpPantry",
+        "title": "Set Up Pantry",
+        "category": "Pantry Match"
+      },
+      {
+        "command": "pantryMatch.openPantryFile",
+        "title": "Open pantry.conf",
+        "category": "Pantry Match"
+      },
+      {
+        "command": "pantryMatch.provideBadge",
+        "title": "Pantry Match",
+        "category": "Pantry Match"
+      }
+    ],
+    "menus": {
+      "commandPalette": [
+        {
+          "command": "pantryMatch.openRecipe",
+          "when": "false"
+        },
+        {
+          "command": "pantryMatch.addMissingToShoppingList",
+          "when": "false"
+        },
+        {
+          "command": "pantryMatch.provideBadge",
+          "when": "false"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "pantryMatch.refresh",
+          "when": "view == pantryMatch.view",
+          "group": "navigation@1"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "pantryMatch.addMissingToShoppingList",
+          "when": "view == pantryMatch.view && viewItem == recipeMissing && pantryMatch.shoppingListAvailable",
+          "group": "1_shopping@1"
+        }
+      ],
+      "cooklang/recipePreview/badge": [
+        {
+          "command": "pantryMatch.provideBadge"
+        }
+      ]
+    },
+    "views": {
+      "explorer": [
+        {
+          "id": "pantryMatch.view",
+          "name": "What can I cook",
+          "visibility": "collapsed"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "pantryMatch.view",
+        "contents": "Open a recipe folder to see what you can cook.",
+        "when": "pantryMatch.state == noWorkspace"
+      },
+      {
+        "view": "pantryMatch.view",
+        "contents": "What can I cook needs a newer Cook Editor. Update Cook Editor to use it.",
+        "when": "pantryMatch.state == unsupported"
+      },
+      {
+        "view": "pantryMatch.view",
+        "contents": "Add a pantry to see what you can cook.\n[Set up pantry](command:pantryMatch.setUpPantry)",
+        "when": "pantryMatch.state == noPantry"
+      },
+      {
+        "view": "pantryMatch.view",
+        "contents": "Your pantry.conf couldn't be read.\n[Open pantry.conf](command:pantryMatch.openPantryFile)",
+        "when": "pantryMatch.state == pantryError"
+      },
+      {
+        "view": "pantryMatch.view",
+        "contents": "Reading your recipes…",
+        "when": "pantryMatch.state == indexing"
+      },
+      {
+        "view": "pantryMatch.view",
+        "contents": "No recipe is within two ingredients of your pantry yet, and nothing in it expires soon.\n[Refresh](command:pantryMatch.refresh)",
+        "when": "pantryMatch.state == empty"
+      }
+    ],
+    "configuration": {
+      "title": "Pantry Match",
+      "properties": {
+        "pantryMatch.alwaysHave": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [
+            "salt",
+            "pepper",
+            "black pepper",
+            "water"
+          ],
+          "order": 1,
+          "description": "Ingredients you always have. They're never listed as missing and don't count towards a recipe's score."
+        },
+        "pantryMatch.expiringWithinDays": {
+          "type": "number",
+          "default": 5,
+          "minimum": 0,
+          "maximum": 365,
+          "order": 2,
+          "description": "Pantry items that expire within this many days, or already have, appear under \"Use it up\"."
+        },
+        "pantryMatch.showBadge": {
+          "type": "boolean",
+          "default": true,
+          "order": 3,
+          "description": "Show a \"Have 9/11\" badge on recipe previews."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath pantry-match-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^22.20.4",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^4.0.0",
+    "mocha": "^12.0.2",
+    "ovsx": "^1.0.0",
+    "typescript": "~7.0.2"
+  }
+}
