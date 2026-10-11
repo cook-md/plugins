@@ -117,9 +117,9 @@ describe('buildBookHtml', () => {
 
     it('groups accented names under their base letter', () => {
         const entry = (name: string) => ({ name, recipes: [{ id: 'r-1', title: 'T' }] });
-        const html = buildBookHtml(input({ index: [entry('apple'), entry('äpfel'), entry('egg'), entry('élan'), entry('łosoś')] }));
+        const html = buildBookHtml(input({ index: [entry('apple'), entry('äpfel'), entry('egg'), entry('élan'), entry('łosoś'), entry('ost'), entry('Øl'), entry('salt'), entry('straße')] }));
         const letters = [...html.matchAll(/<h2 class="index-letter">([^<]*)<\/h2>/g)].map(match => match[1]);
-        assert.deepStrictEqual(letters, ['A', 'E', 'Ł']);
+        assert.deepStrictEqual(letters, ['A', 'E', 'Ł', 'O', 'S']);
     });
 
     it('scopes the uppercase headings to recipes', () => {

@@ -42,6 +42,25 @@ export function lookupStepImage(images: RecipeImages, sectionIndex: number, step
     return images.steps[String(sectionIndex)]?.[String(stepInSection)] ?? images.steps['0']?.[String(globalStepIndex)];
 }
 
+/**
+ * The photos that will actually print: for each step, what {@link lookupStepImage} picks.
+ * `stepCounts` is the number of steps in each section. Unused photos are dropped before inlining
+ * so they don't take up the book's budget.
+ */
+export function selectStepImages(images: RecipeImages, stepCounts: readonly number[]): RecipeImages {
+    const result: RecipeImages = { steps: {}, ...(images.title !== undefined ? { title: images.title } : {}) };
+    let global = 0;
+    stepCounts.forEach((count, section) => {
+        for (let step = 0; step < count; step++, global++) {
+            const uri = lookupStepImage(images, section, step, global);
+            if (uri !== undefined) {
+                (result.steps[String(section)] ??= {})[String(step)] = uri;
+            }
+        }
+    });
+    return result;
+}
+
 export interface ImageFiles {
     /** Size in bytes, or undefined when the file can't be read. */
     size(uri: string): Promise<number | undefined>;

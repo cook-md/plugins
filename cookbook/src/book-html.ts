@@ -187,11 +187,12 @@ export function buildBookHtml(input: BookHtmlInput): string {
 
     if (input.index.length > 0) {
         parts.push('<section class="index" id="index">', '<h1>Index of ingredients</h1>', '<div class="index-columns">');
+        const collator = new Intl.Collator('en', { sensitivity: 'base' });
         let letter = '';
         for (const entry of input.index) {
-            const first = entry.name.normalize('NFD').charAt(0).toUpperCase();
+            const first = entry.name.normalize('NFD').toUpperCase().charAt(0);
             const group = /\p{L}/u.test(first) ? first : '#';
-            if (group !== letter) {
+            if (letter === '' || (group !== letter && !(group !== '#' && letter !== '#' && collator.compare(group, letter) === 0))) {
                 letter = group;
                 parts.push(`<h2 class="index-letter">${escapeHtml(group)}</h2>`);
             }

@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { ImageFiles, ImageInliner, MAX_IMAGE_BYTES, MAX_TOTAL_IMAGE_CHARS, lookupStepImage, mimeType, toDataUri } from './images';
+import { selectStepImages, ImageFiles, ImageInliner, MAX_IMAGE_BYTES, MAX_TOTAL_IMAGE_CHARS, lookupStepImage, mimeType, toDataUri } from './images';
 
 function files(contents: Record<string, Uint8Array>): ImageFiles & { reads: string[] } {
     const reads: string[] = [];
@@ -39,6 +39,14 @@ describe('lookupStepImage', () => {
         assert.strictEqual(lookupStepImage(images, 1, 1, 3), 'linear');
         assert.strictEqual(lookupStepImage(images, 0, 0, 0), 'a');
         assert.strictEqual(lookupStepImage(images, 2, 0, 9), undefined);
+    });
+});
+
+describe('selectStepImages', () => {
+    it('keeps only the step photos lookupStepImage would pick', () => {
+        const images = { title: 't', steps: { 0: { 0: 'a', 1: 'unused', 2: 'linear2' }, 1: { 0: 'section' }, 5: { 0: 'beyond' } } };
+        // Section 0 has steps 0-1, section 1 has step 0: global indexes 0, 1, 2.
+        assert.deepStrictEqual(selectStepImages(images, [2, 1]), { title: 't', steps: { 0: { 0: 'a', 1: 'unused' }, 1: { 0: 'section' } } });
     });
 });
 

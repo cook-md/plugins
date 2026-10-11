@@ -7,7 +7,7 @@ import {
     BookTree, RecipeEntry, buildBookTree, chaptersInOrder, compareNames, isExcluded, readmePaths, recipesInOrder, resolveRelativeImage,
 } from './book-tree';
 import { CooklangApi, RecipeImages } from './cooklang-api';
-import { ImageFiles, ImageInliner, MAX_IMAGE_BYTES } from './images';
+import { ImageFiles, ImageInliner, MAX_IMAGE_BYTES, selectStepImages } from './images';
 import { IndexedRecipe, buildIngredientIndex } from './ingredient-index';
 import { markdownImageSources } from './markdown';
 import { NUTRITION_TEMPLATE, nutritionLine, parseNutritionOutput, servingsFromMetadata } from './nutrition-line';
@@ -270,7 +270,7 @@ export class CookbookExporter {
                 return { failure: { path: entry.path, reason: 'The report engine returned something unexpected.' } };
             }
             const title = recipeTitle(data, entry.title);
-            const images = await this.recipeImages(uri, inliner);
+            const images = await this.recipeImages(uri, inliner, data.sections.map(section => section.blocks.filter(block => block.kind === 'step').length));
             const line = nutrition.enabled ? await this.nutritionLine(uri, data.metadata, nutrition) : undefined;
             const html = renderRecipeHtml({ id, title, data, images, ...(line !== undefined ? { nutritionLine: line } : {}) });
             return { recipe: { id, path: entry.path, title, html }, indexed: { id, title, ingredients: data.ingredients } };
@@ -280,9 +280,9 @@ export class CookbookExporter {
     }
 
     /** No photos on any error: a missing photo never drops a recipe. */
-    protected async recipeImages(uri: string, inliner: ImageInliner): Promise<RecipeImages> {
+    protected async recipeImages(uri: string, inliner: ImageInliner, stepCounts: readonly number[]): Promise<RecipeImages> {
         try {
-            return await inliner.inlineAll(await this.api.recipeImages(uri));
+            return await inliner.inlineAll(selectStepImages(await this.api.recipeImages(uri), stepCounts));
         } catch {
             return { steps: {} };
         }
@@ -303,6 +303,7 @@ export class CookbookExporter {
             const summary = parseNutritionOutput(result.output);
             return summary ? nutritionLine(summary, servingsFromMetadata(metadata)) : undefined;
         } catch {
+            nutrition.unavailable++;
             return undefined;
         }
     }

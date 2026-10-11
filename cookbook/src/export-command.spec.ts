@@ -44,6 +44,8 @@ interface Options {
     exportThrows?: string;
     maxHtmlChars?: number;
     imageBytes?: number;
+    throwNutrition?: boolean;
+    onImageRead?: (uri: string) => void;
 }
 
 function fixture(options: Options = {}): Fixture {
@@ -58,6 +60,9 @@ function fixture(options: Options = {}): Fixture {
                 return options.hasFeature ?? false;
             case 'cooklang.api.renderReport':
                 if (arg.template!.includes('aggregate_nutrition')) {
+                    if (options.throwNutrition) {
+                        throw new Error('offline');
+                    }
                     return options.nutrition ?? { ok: true, output: aggregate };
                 }
                 renderCount++;
@@ -78,7 +83,7 @@ function fixture(options: Options = {}): Fixture {
         readText: async uri => files[decodeURIComponent(uri.slice(FOLDER.uri.length + 1))],
         images: {
             size: async uri => (uri.endsWith('.jpg') ? options.imageBytes ?? 3 : undefined),
-            read: async () => (options.imageBytes === undefined ? new Uint8Array([1, 2, 3]) : new Uint8Array(options.imageBytes)),
+            read: async uri => (options.onImageRead?.(uri), options.imageBytes === undefined ? new Uint8Array([1, 2, 3]) : new Uint8Array(options.imageBytes)),
         },
     };
     const state = { messages: [] as string[], opened: [] as string[], progress: [] as string[] };
@@ -286,6 +291,24 @@ describe('CookbookExporter', () => {
         await tick();
         const warnings = ui.messages.filter(message => message.includes('nutrition'));
         assert.deepStrictEqual(warnings, ['warning: 3 recipes have no nutrition line because the nutrition service could not be reached. []']);
+    });
+
+    it('counts a throwing nutrition render as unavailable', async () => {
+        const { exporter, ui } = fixture({ files: { 'a.cook': '' }, hasFeature: true, nutrition: { ok: true, output: '{}' }, throwNutrition: true });
+        await exporter.export(FOLDER);
+        await tick();
+        assert.ok(ui.messages.includes('warning: 1 recipe has no nutrition line because the nutrition service could not be reached. []'));
+    });
+
+    it('does not inline step photos that never print', async () => {
+        const reads: string[] = [];
+        const { exporter } = fixture({
+            files: { 'a.cook': '' },
+            images: { 'file:///ws/Book/a.cook': { steps: { 0: { 0: 'file:///ws/Book/used.jpg', 7: 'file:///ws/Book/unused.jpg' } } } },
+            onImageRead: uri => reads.push(uri),
+        });
+        await exporter.export(FOLDER);
+        assert.deepStrictEqual(reads, ['file:///ws/Book/used.jpg']);
     });
 
     it('opens the saved file when asked', async () => {
