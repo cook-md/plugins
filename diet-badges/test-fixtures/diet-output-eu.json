@@ -1,0 +1,155 @@
+{
+  "names": [
+    "plain flour",
+    "butter",
+    "almonds",
+    "saffron",
+    "unobtainium",
+    "soy sauce"
+  ],
+  "refs": [],
+  "missing": [],
+  "items": [
+    {
+      "ingredient": "flour",
+      "allergens": {
+        "status": "unverified",
+        "contains": [],
+        "view": "eu"
+      },
+      "warnings": [
+        {
+          "code": "prep_fallback",
+          "message": "preparation '' not available; used 'raw'",
+          "details": {
+            "requested": "",
+            "step": "raw",
+            "used": "raw"
+          }
+        }
+      ],
+      "categories": [],
+      "plant": ""
+    },
+    {
+      "ingredient": "butter",
+      "allergens": {
+        "status": "verified",
+        "contains": [
+          {
+            "class": "milk",
+            "label": "Milk"
+          }
+        ],
+        "view": "eu"
+      },
+      "warnings": [
+        {
+          "code": "prep_fallback",
+          "message": "preparation '' not available; used 'raw'",
+          "details": {
+            "requested": "",
+            "step": "raw",
+            "used": "raw"
+          }
+        }
+      ],
+      "categories": [
+        "dairy_and_egg",
+        "butter"
+      ],
+      "plant": ""
+    },
+    {
+      "ingredient": "almond",
+      "allergens": {
+        "status": "verified",
+        "contains": [
+          {
+            "class": "tree_nuts",
+            "subtype": "almond",
+            "label": "Almonds"
+          }
+        ],
+        "view": "eu"
+      },
+      "warnings": [
+        {
+          "code": "prep_fallback",
+          "message": "preparation '' not available; used 'raw'",
+          "details": {
+            "requested": "",
+            "step": "raw",
+            "used": "raw"
+          }
+        }
+      ],
+      "categories": [],
+      "plant": "nuts_and_seeds"
+    },
+    {
+      "ingredient": "saffron",
+      "allergens": {
+        "status": "unverified",
+        "contains": [],
+        "view": "eu"
+      },
+      "warnings": [
+        {
+          "code": "prep_fallback",
+          "message": "preparation '' not available; used 'raw'",
+          "details": {
+            "requested": "",
+            "step": "raw",
+            "used": "raw"
+          }
+        }
+      ],
+      "categories": [],
+      "plant": ""
+    },
+    {
+      "ingredient": "soy sauce",
+      "allergens": {
+        "status": "verified",
+        "contains": [
+          {
+            "class": "gluten",
+            "subtype": "wheat",
+            "label": "Wheat"
+          },
+          {
+            "class": "soybeans",
+            "label": "Soybeans"
+          }
+        ],
+        "view": "eu"
+      },
+      "warnings": [
+        {
+          "code": "prep_fallback",
+          "message": "preparation '' not available; used 'raw'",
+          "details": {
+            "requested": "",
+            "step": "raw",
+            "used": "raw"
+          }
+        }
+      ],
+      "categories": [],
+      "plant": ""
+    }
+  ],
+  "failures": [
+    {
+      "index": 4,
+      "ingredient": "unobtainium",
+      "error": {
+        "code": "ingredient_not_found",
+        "message": "ingredient not found: unobtainium",
+        "field": "ingredient",
+        "received": "unobtainium"
+      }
+    }
+  ]
+}
