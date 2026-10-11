@@ -14,6 +14,7 @@ writing your own. Each plugin is a standalone npm package in its own folder.
 | [`allergens`](./allergens) | Flags the allergens you choose on recipe previews: the 14 regulated allergens (Cook Basic or Pro) and your own words (free). Install it from the Extensions view. Shows a `pill` preview badge and `cooklang.api.refreshBadges`. |
 | [`corevitals`](./corevitals) | `Vitals 14/17` badge on meal plans and recipes: targets met against FDA/EU/UK daily values, with a full report with charts. Needs a Cook Basic or Pro plan. Install it from the Extensions view. Shows the menu badge outlet and opening a report tab with `cooklang.api.openReport`. |
 | [`diet-badges`](./diet-badges) | `Vegan`, `Vegetarian`, `Pescatarian` or `Dairy-free` badge on recipe and meal-plan previews: green when every ingredient was checked, amber with `?` when something couldn't be. Needs a Cook Basic or Pro plan. Install it from the Extensions view. Shows one command serving both badge outlets and `is_in_category` in a report template. |
+| [`macros`](./macros) | `38P 52C 14F · 520 kcal` pill on recipe previews (per serving) and meal plans (per person per day), with a hover table of macros and energy shares. Needs a Cook Basic or Pro plan. Install it from the Extensions view. Shows one badge command on both badge outlets and a template that branches on the engine's `plan` context. |
 
 ## How plugins work
 

@@ -1,0 +1,8 @@
+src/**
+scripts/**
+tsconfig.json
+package-lock.json
+.vscodeignore
+out/**/*.spec.js
+out/**/*.map
+**/.DS_Store

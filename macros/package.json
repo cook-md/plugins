@@ -1,0 +1,73 @@
+{
+  "name": "macros",
+  "displayName": "Macros",
+  "description": "Protein, carbs and fat per serving on recipe previews and per person per day on meal plans, from the cook.md nutrition service. Needs a Basic or Pro plan.",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/cook-md/plugins.git", "directory": "macros" },
+  "keywords": ["cooklang", "nutrition", "macros", "protein", "meal plan", "recipes"],
+  "engines": { "vscode": "^1.100.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onStartupFinished"],
+  "contributes": {
+    "commands": [
+      { "command": "cooklang.macros.provideBadge", "title": "Macros", "category": "Macros" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "cooklang.macros.provideBadge", "when": "false" }
+      ],
+      "cooklang/recipePreview/badge": [
+        { "command": "cooklang.macros.provideBadge" }
+      ],
+      "cooklang/menuPreview/badge": [
+        { "command": "cooklang.macros.provideBadge" }
+      ]
+    },
+    "configuration": {
+      "title": "Macros",
+      "properties": {
+        "macros.showEnergy": {
+          "type": "boolean",
+          "default": true,
+          "order": 1,
+          "description": "Add the energy (kcal) to the pill when it fits. The hover always shows it."
+        },
+        "macros.basis": {
+          "type": "string",
+          "enum": ["serving", "100g"],
+          "enumDescriptions": ["Per serving, from the recipe's servings: frontmatter (the whole recipe without one)", "Per 100 g of the finished dish"],
+          "default": "serving",
+          "order": 2,
+          "description": "What recipe figures are per. Meal plans are always per person per day."
+        },
+        "macros.showWhenLocked": {
+          "type": "boolean",
+          "default": true,
+          "order": 3,
+          "description": "Show a greyed Macros pill with an upgrade hint when your plan doesn't include nutrition data."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath macros-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^22.20.4",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^4.0.0",
+    "mocha": "^12.0.2",
+    "ovsx": "^1.0.0",
+    "typescript": "~7.0.2"
+  }
+}

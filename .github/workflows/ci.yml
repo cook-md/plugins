@@ -15,7 +15,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        package: [allergens, corevitals, diet-badges, favourites, meal-journal, nutriscore, pantry, recipe-hub, shopping-list]
+        package: [allergens, corevitals, diet-badges, favourites, macros, meal-journal, nutriscore, pantry, recipe-hub, shopping-list]
     defaults:
       run:
         working-directory: ${{ matrix.package }}
