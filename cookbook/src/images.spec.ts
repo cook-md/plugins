@@ -54,7 +54,7 @@ describe('ImageInliner', () => {
 
     it('skips unknown types, unreadable files, oversized files and files past the budget', async () => {
         const fs = files({ 'file:///b/big.jpg': new Uint8Array(11), 'file:///b/a.jpg': new Uint8Array(3), 'file:///b/c.jpg': new Uint8Array(3), 'file:///b/x.gif': new Uint8Array(1) });
-        const inliner = new ImageInliner(fs, 10, 6);
+        const inliner = new ImageInliner(fs, 10, 30);
         assert.strictEqual(await inliner.inline('file:///b/x.gif'), undefined);
         assert.strictEqual(await inliner.inline('file:///b/missing.jpg'), undefined);
         assert.strictEqual(await inliner.inline('javascript:alert(1).png'), undefined);
