@@ -1,4 +1,4 @@
-import { matchesWord } from './custom-match';
+import { matchRange, matchesWord } from './custom-match';
 import { DietIngredient, DietOutput } from './diet-template';
 import { DIET_IDS, DietId } from './settings';
 
@@ -56,12 +56,22 @@ export const EXEMPT_PHRASES: readonly RegExp[] = [
 ];
 
 /**
- * Words that mark an analogue ("vegan sausage", "coconut bacon", "chicken-style stock"). A word hit
- * next to one is unknown rather than a fail; it is never a pass, and categories and allergens still decide first.
+ * Words that mark an analogue ("vegan sausage", "coconut bacon"). A word hit they are attached to is
+ * unknown rather than a fail; it is never a pass, and categories and allergens still decide first.
+ * Attached means directly before the word or with one word in between ("plant-based mince beef"),
+ * or after it as `<word>-style`, `<word> style` or `<word>-free`.
  */
 export const ANALOGUE_QUALIFIERS: readonly string[] = [
-    'vegan', 'vegetarian', 'veggie', 'plant-based', 'plant based', 'meat-free', 'meat free', 'meatless', 'mock', 'faux', 'imitation', 'style',
-    'tofu', 'tempeh', 'seitan', 'soy', 'coconut', 'mushroom', 'jackfruit',
+    'vegan', 'vegetarian', 'veggie', 'plant-based', 'plant based', 'meat-free', 'meat free', 'meatless', 'mock', 'faux', 'imitation',
+    'tofu', 'tempeh', 'seitan', 'jackfruit',
+];
+/**
+ * Ingredients that are also real foods ("coconut chicken curry", "chicken and mushroom soup"), so
+ * they only mark an analogue next to a cured-meat word that they commonly imitate ("coconut bacon").
+ */
+export const WEAK_QUALIFIERS: readonly string[] = ['coconut', 'mushroom', 'soy'];
+export const IMITATED_WORDS: readonly string[] = [
+    'bacon', 'lardons', 'ham', 'pancetta', 'guanciale', 'prosciutto', 'chorizo', 'salami', 'sausage', 'pepperoni', 'mortadella', 'bresaola',
 ];
 
 export interface DietRule {
@@ -133,21 +143,44 @@ function stripExempt(name: string): string {
     return EXEMPT_PHRASES.reduce((text, phrase) => text.replace(phrase, ' '), normalize(name));
 }
 
-function isQualified(names: readonly string[]): boolean {
-    return names.some(name => ANALOGUE_QUALIFIERS.some(qualifier => matchesWord(qualifier, name)));
+/** Whether a qualifier sits right before (at most one word between) or right after (`-style`, ` style`, `-free`) the word hit. */
+function isQualifiedHit(text: string, word: string): boolean {
+    const range = matchRange(word, text);
+    if (range === undefined) {
+        return false;
+    }
+    const before = text.slice(0, range.index).split(/\s+/).filter(token => token !== '');
+    const precedes = (qualifier: string): boolean => {
+        const size = qualifier.split(/\s+/).length + 1;
+        return matchesWord(qualifier, before.slice(-size).join(' '));
+    };
+    if (ANALOGUE_QUALIFIERS.some(precedes)) {
+        return true;
+    }
+    if (IMITATED_WORDS.some(imitated => matchesWord(imitated, word)) && WEAK_QUALIFIERS.some(precedes)) {
+        return true;
+    }
+    return /^(?:-|\s+)(?:style|free)(?![\p{L}\p{N}])/iu.test(text.slice(range.end));
 }
 
-/** A built-in or user word found in any of the names, after removing the exempt phrases. */
+/**
+ * A built-in or user word found in any of the names, after removing the exempt phrases. Qualified
+ * when a qualifier is attached to the word in any name that has it.
+ */
 function matchingWord(rule: DietRule, names: readonly string[], userWords: readonly string[]): WordHit | undefined {
     const words = [...rule.words, ...(rule.userWords ? userWords : [])];
-    const stripped = names.map(stripExempt);
-    for (const text of stripped) {
+    let first: WordHit | undefined;
+    for (const text of names.map(stripExempt)) {
         const word = words.find(candidate => matchesWord(candidate, text));
         if (word !== undefined) {
-            return { word, qualified: isQualified(names) };
+            const qualified = isQualifiedHit(text, word);
+            if (qualified) {
+                return { word, qualified };
+            }
+            first ??= { word, qualified };
         }
     }
-    return undefined;
+    return first;
 }
 
 function isClassified(rule: DietRule, ingredient: DietIngredient): boolean {

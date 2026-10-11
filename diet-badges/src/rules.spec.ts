@@ -124,6 +124,20 @@ describe('evaluateDiets', () => {
         }
     });
 
+    it('keeps failing real dishes where a qualifier word is not attached to the meat word', () => {
+        for (const [name, reason] of [['chicken and mushroom soup', 'chicken'], ['country-style pork ribs', 'pork'], ['coconut chicken curry', 'chicken'], ['soy sauce marinated bacon', 'bacon'], ['bacon, mushroom and tofu pie', 'bacon']]) {
+            const verdicts = evaluateDiets(output([ing(name)]), []);
+            assert.deepStrictEqual(statuses(verdicts), ['fail', 'fail', 'fail', 'pass'], name);
+            assert.deepStrictEqual(verdicts.pescatarian.violations, [{ ingredient: name, reason }], name);
+        }
+    });
+
+    it('treats `-free` and `style` after the word as an analogue marker', () => {
+        for (const name of ['chicken-style seasoning', 'chicken style seasoning', 'bacon-free bits']) {
+            assert.deepStrictEqual(statuses(evaluateDiets(output([ing(name)]), [])), ['unknown', 'unknown', 'unknown', 'pass'], name);
+        }
+    });
+
     it('lets categories and allergens beat a qualifier', () => {
         const verdicts = evaluateDiets(output([ing('vegan sausage', { categories: ['meat'] })]), []);
         assert.deepStrictEqual(statuses(verdicts), ['fail', 'fail', 'fail', 'pass']);
@@ -144,7 +158,7 @@ describe('evaluateDiets', () => {
     it('also matches words against the service\'s canonical name', () => {
         const pork = evaluateDiets(output([ing('mince', { canonical: 'Pork mince' })]), []);
         assert.deepStrictEqual(statuses(pork), ['fail', 'fail', 'fail', 'pass']);
-        const vegan = evaluateDiets(output([ing('sausage', { canonical: 'Sausage, vegan' })]), []);
+        const vegan = evaluateDiets(output([ing('sausage', { canonical: 'Vegan sausage' })]), []);
         assert.deepStrictEqual(statuses(vegan), ['unknown', 'unknown', 'unknown', 'pass']);
     });
 

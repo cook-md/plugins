@@ -33,6 +33,12 @@ export function matchesWord(word: string, ingredientName: string): boolean {
     return wordPattern(word).test(ingredientName.normalize('NFC'));
 }
 
+/** Where the word first matches in the (NFC-normalised) name, as offsets into that normalised name. */
+export function matchRange(word: string, ingredientName: string): { index: number; end: number } | undefined {
+    const match = wordPattern(word).exec(ingredientName.normalize('NFC'));
+    return match ? { index: match.index, end: match.index + match[0].length } : undefined;
+}
+
 /** Words with at least one match, in the order given. */
 export function matchCustomWords(words: readonly string[], ingredientNames: readonly string[]): CustomWordMatch[] {
     const matches: CustomWordMatch[] = [];
