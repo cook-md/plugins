@@ -1,0 +1,67 @@
+{
+  "name": "cookbook",
+  "displayName": "Cookbook",
+  "description": "Turns a folder of recipes into a printable PDF cookbook: cover, contents, a chapter per subfolder, photos and an ingredient index.",
+  "version": "0.1.0",
+  "publisher": "cooklang",
+  "license": "MIT",
+  "repository": { "type": "git", "url": "https://github.com/cook-md/plugins.git", "directory": "cookbook" },
+  "keywords": ["cooklang", "cookbook", "pdf", "print", "recipes"],
+  "engines": { "vscode": "^1.100.0" },
+  "categories": ["Other"],
+  "main": "./out/extension.js",
+  "activationEvents": ["onCommand:cookbook.export"],
+  "contributes": {
+    "commands": [
+      { "command": "cookbook.export", "title": "Export as Cookbook (PDF)…", "category": "Cookbook" }
+    ],
+    "menus": {
+      "explorer/context": [
+        { "command": "cookbook.export", "when": "explorerResourceIsFolder", "group": "navigation@95" }
+      ]
+    },
+    "configuration": {
+      "title": "Cookbook",
+      "properties": {
+        "cookbook.exclude": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["Drafts", "config"],
+          "order": 1,
+          "description": "Folders left out of the book: a name matches a folder of that name at any depth, a path with a slash (e.g. Mains/Old) matches that folder. Dot-folders and node_modules are always skipped."
+        },
+        "cookbook.nutrition": {
+          "type": "boolean",
+          "default": true,
+          "order": 2,
+          "description": "Print a per-serving nutrition line under each recipe. Needs a Cook Basic or Pro plan; left out otherwise."
+        },
+        "cookbook.pageSize": {
+          "type": "string",
+          "enum": ["A4", "Letter"],
+          "default": "A4",
+          "order": 3,
+          "description": "Paper size of the PDF."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p .",
+    "watch": "tsc -w -p .",
+    "test": "tsc -p . && mocha \"out/**/*.spec.js\"",
+    "deploy": "npm run compile && node ./scripts/deploy.js",
+    "vscode:prepublish": "npm run compile",
+    "package": "vsce package --no-dependencies",
+    "publish:marketplace": "ovsx publish --packagePath cookbook-$npm_package_version.vsix -r https://plugins.cook.md"
+  },
+  "devDependencies": {
+    "@types/mocha": "^10.0.6",
+    "@types/node": "^22.20.4",
+    "@types/vscode": "~1.100.0",
+    "@vscode/vsce": "^4.0.0",
+    "mocha": "^12.0.2",
+    "ovsx": "^1.0.0",
+    "typescript": "~7.0.2"
+  }
+}
