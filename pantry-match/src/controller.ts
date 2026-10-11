@@ -218,15 +218,12 @@ export class PantryMatchController implements vscode.Disposable {
             }
             this.lookup = this.pantry.kind === 'ok' ? pantryLookup(this.pantry.items, this.settings().alwaysHave) : undefined;
         }
-        if (this.badgesDirty) {
-            this.badgesDirty = false;
-            await this.api.refreshBadges().catch(() => false);
-            if (this.disposed) {
-                return;
-            }
-        }
         const pantry = this.pantry;
         const plan = planUpdate(pantry.kind, this.viewed, this.index.size() === 0);
+        // A scan refreshes badges once the index is current, so a preview doesn't capture stale linked-recipe names.
+        if (plan.action !== 'scan' && !await this.refreshBadgesIfDirty()) {
+            return;
+        }
         if (plan.action === 'show-empty') {
             this.show(EMPTY_MODEL, plan.pantryMessage && pantry.kind === 'error' ? pantry.message : undefined);
             await this.setState(plan.state);
@@ -240,12 +237,16 @@ export class PantryMatchController implements vscode.Disposable {
         }
         try {
             await this.index.refresh((done, total) => {
-                this.treeView.message = done < total ? `Reading recipes… ${done}/${total}` : undefined;
+                if (!this.disposed) {
+                    this.treeView.message = done < total ? `Reading recipes… ${done}/${total}` : undefined;
+                }
             });
         } finally {
-            this.treeView.message = undefined;
+            if (!this.disposed) {
+                this.treeView.message = undefined;
+            }
         }
-        if (this.disposed) {
+        if (this.disposed || !await this.refreshBadgesIfDirty()) {
             return;
         }
         const model = await this.buildModel(pantry.items);
@@ -254,6 +255,15 @@ export class PantryMatchController implements vscode.Disposable {
         }
         this.show(model, undefined);
         await this.setState(resultState(isEmptyModel(model)));
+    }
+
+    /** False when the controller was disposed meanwhile. */
+    protected async refreshBadgesIfDirty(): Promise<boolean> {
+        if (this.badgesDirty) {
+            this.badgesDirty = false;
+            await this.api.refreshBadges().catch(() => false);
+        }
+        return !this.disposed;
     }
 
     protected async buildModel(items: readonly PantryItem[]): Promise<ViewModel> {

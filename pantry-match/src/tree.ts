@@ -62,6 +62,7 @@ export class PantryMatchTreeProvider implements vscode.TreeDataProvider<TreeNode
             }
             case 'more': {
                 const item = new vscode.TreeItem(`+${node.count} more`, None);
+                item.tooltip = `${node.count} more ${node.count === 1 ? 'recipe uses' : 'recipes use'} this. Open the recipes to see them all.`;
                 item.contextValue = 'more';
                 return item;
             }
