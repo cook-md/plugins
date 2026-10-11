@@ -53,6 +53,16 @@ export class MacrosBadgeProvider {
         if (!await this.api.hasFeature('nutrition_api')) {
             return lockedBadge(settings.showWhenLocked);
         }
+        try {
+            return await this.build(context, settings);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logOnce('error', message);
+            return serviceErrorBadge('error', message);
+        }
+    }
+
+    protected async build(context: PreviewOutletContext, settings: MacrosSettings): Promise<PillBadge | undefined> {
         const isMenu = isMenuUri(context.uri);
         // The engine expands a menu's recipes at 1× whatever the menu scale, and per-person-per-day
         // figures do not depend on it; a recipe is rendered at the preview scale.
@@ -69,6 +79,7 @@ export class MacrosBadgeProvider {
             }
         }
         let output = cacheKey === undefined ? undefined : this.recall(cacheKey);
+        let fresh = false;
         if (!output) {
             const result = await this.api.renderReport({ uri: context.uri, template: MACROS_TEMPLATE, scale });
             if (!result.ok) {
@@ -85,9 +96,7 @@ export class MacrosBadgeProvider {
                 this.logOnce('output', 'unexpected template output');
                 return undefined;
             }
-            if (cacheKey !== undefined) {
-                this.remember(cacheKey, output);
-            }
+            fresh = true;
         }
         // A badge is about to be shown: earlier failures are superseded. An unreadable document is
         // a standing condition, not a failure the success supersedes.
@@ -96,7 +105,12 @@ export class MacrosBadgeProvider {
         if (readFailed) {
             this.logged.add('read');
         }
-        return badgeFor(computeMacros(output, { basis: settings.basis, servings, scale }), settings.showEnergy);
+        const computed = computeMacros(output, { basis: settings.basis, servings, scale });
+        // A low-confidence render may be a partial service outage: keep it out of the cache so the next refresh retries.
+        if (fresh && cacheKey !== undefined && computed.withheld !== 'unmatched') {
+            this.remember(cacheKey, output);
+        }
+        return badgeFor(computed, settings.showEnergy);
     }
 
     /** Forgets every cached render, e.g. after the nutrition service URL changed. */

@@ -186,6 +186,31 @@ describe('MacrosBadgeProvider', () => {
         assert.strictEqual(fixture.renders.length, 4);
     });
 
+    it('does not cache a low-confidence render, so a partial outage can recover', async () => {
+        const fixture = new Fixture();
+        fixture.results = [recipeResult(aggregate(1, ['ghee', 'garam masala'])), recipeResult()];
+        const provider = fixture.provider();
+        assert.strictEqual((await provider.provide(RECIPE))?.text, 'Macros ?');
+        assert.strictEqual((await provider.provide(RECIPE))?.text, '38P 52C 14F · 520 kcal');
+        assert.strictEqual(fixture.renders.length, 2);
+    });
+
+    it('shows the service-error pill and logs once when rendering throws', async () => {
+        const fixture = new Fixture();
+        const api = new CooklangApi(async command => {
+            if (command === 'cooklang.api.hasFeature') {
+                return true;
+            }
+            throw new Error('boom');
+        }, async () => []);
+        const provider = new MacrosBadgeProvider(api, message => fixture.logs.push(message), () => fixture.settings, async uri => fixture.texts.get(uri));
+        const badge = await provider.provide(RECIPE);
+        assert.deepStrictEqual({ text: badge?.text, tone: badge?.tone }, { text: 'Macros ?', tone: 'warning' });
+        assert.ok(badge?.tooltipMarkdown.includes('(error): boom'));
+        await provider.provide(RECIPE);
+        assert.deepStrictEqual(fixture.logs, ['Macros unavailable (error): boom']);
+    });
+
     it('does not cache menus or failures', async () => {
         const fixture = new Fixture();
         const plan: PluginReportResult = { ok: true, output: JSON.stringify({ kind: 'plan', aggregate: aggregate(), days: 1, people: 1, missingRecipes: [] }) };
