@@ -64,6 +64,26 @@ describe('buildViewModel', () => {
     });
 });
 
+describe('Use it up edge cases', () => {
+    it('sorts recipes that only use the item optionally (0 required) last, and shows them as optional', () => {
+        const optionalOnly = recipe('Garnish.cook', '?spinach');
+        const real = recipe('Zesty.cook', 'spinach', 'tofu');
+        const result = buildViewModel([optionalOnly, real], [], lookup, [spinach]);
+        assert.deepStrictEqual(result.useItUp[0].recipes.map(row => [row.title, row.total]), [['Zesty', 2], ['Garnish', 0]]);
+    });
+
+    it('shows the top 10 recipes under an item, then a "+N more" leaf', () => {
+        const many = Array.from({ length: 13 }, (_, i) => recipe(`R${String(i).padStart(2, '0')}.cook`, 'spinach', 'tofu'));
+        const result = buildViewModel(many, [], lookup, [spinach]);
+        const useItUp = childrenOf(result).find(node => node.kind === 'group' && node.group === 'useItUp');
+        const [expiring] = childrenOf(result, useItUp);
+        const kids = childrenOf(result, expiring);
+        assert.strictEqual(kids.length, 11);
+        assert.deepStrictEqual(kids[10].kind === 'more' ? kids[10].count : undefined, 3);
+        assert.strictEqual(new Set(kids.map(nodeId)).size, 11);
+    });
+});
+
 describe('childrenOf', () => {
     const group = (id: string): TreeNode => {
         const found = childrenOf(model).find(node => node.kind === 'group' && node.group === id);

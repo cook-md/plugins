@@ -51,7 +51,7 @@ export interface ExpanderDeps {
 
 export class ReferenceExpander {
 
-    protected readonly trees = new Map<string, Promise<ResolvedRecipeReference[]>>();
+    protected readonly trees = new Map<string, { tree: Promise<ResolvedRecipeReference[]>; paths?: Set<string> }>();
 
     constructor(protected readonly deps: ExpanderDeps, protected readonly maxDepth = MAX_REFERENCE_DEPTH) { }
 
@@ -75,12 +75,33 @@ export class ReferenceExpander {
         this.trees.clear();
     }
 
-    protected tree(path: string): Promise<ResolvedRecipeReference[]> {
-        let tree = this.trees.get(path);
-        if (!tree) {
-            tree = this.deps.resolve(path).then(result => Array.isArray(result) ? result : [], () => []);
-            this.trees.set(path, tree);
+    /**
+     * A recipe at `path` changed: drops the cached trees that start at it or contain it.
+     * Trees still being resolved are dropped too, since they may predate the change.
+     */
+    invalidate(path: string): void {
+        const changed = referencePath(path).toLowerCase();
+        for (const [key, entry] of [...this.trees]) {
+            if (!entry.paths || entry.paths.has(changed) || referencePath(key).toLowerCase() === changed) {
+                this.trees.delete(key);
+            }
         }
-        return tree;
+    }
+
+    protected tree(path: string): Promise<ResolvedRecipeReference[]> {
+        let entry = this.trees.get(path);
+        if (!entry) {
+            const created: { tree: Promise<ResolvedRecipeReference[]>; paths?: Set<string> } = {
+                tree: this.deps.resolve(path)
+                    .then(result => Array.isArray(result) ? result : [], () => [])
+                    .then(tree => {
+                        created.paths = new Set(flattenReferencePaths(tree, path, this.maxDepth).map(ref => ref.toLowerCase()));
+                        return tree;
+                    }),
+            };
+            entry = created;
+            this.trees.set(path, entry);
+        }
+        return entry.tree;
     }
 }

@@ -44,6 +44,7 @@ export async function mapInBatches<T, R>(
 export class RecipeIndex {
 
     protected readonly files = new Map<string, IndexEntry>();
+    protected readonly byPathMap = new Map<string, string>();
     protected readonly stale = new Set<string>();
     protected running: Promise<void> | undefined;
     protected rerun = false;
@@ -77,7 +78,12 @@ export class RecipeIndex {
 
     clear(): void {
         this.files.clear();
+        this.byPathMap.clear();
         this.stale.clear();
+    }
+
+    size(): number {
+        return this.files.size;
     }
 
     entries(): IndexEntry[] {
@@ -86,12 +92,9 @@ export class RecipeIndex {
 
     /** The cached, up-to-date entry for a workspace-relative path. */
     byPath(path: string): IndexEntry | undefined {
-        for (const entry of this.files.values()) {
-            if (entry.path === path && !this.stale.has(entry.uri)) {
-                return entry;
-            }
-        }
-        return undefined;
+        const uri = this.byPathMap.get(path);
+        const entry = uri === undefined ? undefined : this.files.get(uri);
+        return entry && !this.stale.has(entry.uri) ? entry : undefined;
     }
 
     protected async scan(onProgress?: Progress): Promise<void> {
@@ -99,8 +102,7 @@ export class RecipeIndex {
         const present = new Set(listed.map(recipe => recipe.uri));
         for (const uri of [...this.files.keys()]) {
             if (!present.has(uri)) {
-                this.files.delete(uri);
-                this.stale.delete(uri);
+                this.forget(uri);
             }
         }
         onProgress?.(0, listed.length);
@@ -110,8 +112,7 @@ export class RecipeIndex {
     protected async update(recipe: RecipeFile): Promise<void> {
         const mtime = await this.deps.mtime(recipe.uri);
         if (mtime === undefined) {
-            this.files.delete(recipe.uri);
-            this.stale.delete(recipe.uri);
+            this.forget(recipe.uri);
             return;
         }
         const cached = this.files.get(recipe.uri);
@@ -122,5 +123,15 @@ export class RecipeIndex {
         this.stale.delete(recipe.uri);
         const result = await this.deps.render(recipe.uri);
         this.files.set(recipe.uri, { ...recipe, mtime, result });
+        this.byPathMap.set(recipe.path, recipe.uri);
+    }
+
+    protected forget(uri: string): void {
+        const entry = this.files.get(uri);
+        if (entry && this.byPathMap.get(entry.path) === uri) {
+            this.byPathMap.delete(entry.path);
+        }
+        this.files.delete(uri);
+        this.stale.delete(uri);
     }
 }

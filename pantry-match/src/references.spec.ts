@@ -115,4 +115,22 @@ describe('ReferenceExpander', () => {
         await expander.ingredientsFor('A.cook', own);
         assert.deepStrictEqual(resolved, ['A.cook', 'A.cook']);
     });
+
+    it('invalidates only trees that include the changed path', async () => {
+        const { expander, resolved } = setup(
+            { 'A.cook': [ref('B')], 'C.cook': [ref('D')] },
+            { 'B.cook': names('b'), 'D.cook': names('d') },
+        );
+        const ownA: RecipeNames = { names: [], refs: ['./B'] };
+        const ownC: RecipeNames = { names: [], refs: ['./D'] };
+        await expander.ingredientsFor('A.cook', ownA);
+        await expander.ingredientsFor('C.cook', ownC);
+        expander.invalidate('B.cook');
+        await expander.ingredientsFor('A.cook', ownA);
+        await expander.ingredientsFor('C.cook', ownC);
+        assert.deepStrictEqual(resolved, ['A.cook', 'C.cook', 'A.cook']);
+        expander.invalidate('C.cook');
+        await expander.ingredientsFor('C.cook', ownC);
+        assert.deepStrictEqual(resolved, ['A.cook', 'C.cook', 'A.cook', 'C.cook']);
+    });
 });

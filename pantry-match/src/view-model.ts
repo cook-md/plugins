@@ -4,6 +4,8 @@ import { coverage, matchIngredients, PantryLookup } from './match';
 import { IngredientName } from './names-template';
 
 export const MAX_MISSING = 2;
+/** Recipes listed under one Use it up item; the rest collapse into a "+N more" leaf. */
+export const MAX_RECIPES_PER_ITEM = 10;
 
 export interface IndexedRecipe {
     uri: string;
@@ -65,7 +67,8 @@ export function compareByMissing(a: RecipeRow, b: RecipeRow): number {
 
 /** Use it up: best coverage first, then fewest missing. */
 export function compareByCoverage(a: RecipeRow, b: RecipeRow): number {
-    return coverage(b) - coverage(a) || a.missing.length - b.missing.length || byTitle(a, b);
+    // Recipes that only use the item optionally (nothing required to check) come last.
+    return Number(a.total === 0) - Number(b.total === 0) || coverage(b) - coverage(a) || a.missing.length - b.missing.length || byTitle(a, b);
 }
 
 export function buildViewModel(
@@ -113,6 +116,7 @@ export type TreeNode =
     | { kind: 'group'; group: GroupId; count: number }
     | { kind: 'recipe'; row: RecipeRow; parentId: string }
     | { kind: 'missing'; name: string; parentId: string }
+    | { kind: 'more'; count: number; parentId: string }
     | { kind: 'expiring'; row: ExpiringRow }
     | { kind: 'unreadable'; row: UnreadableRow };
 
@@ -122,6 +126,7 @@ export function nodeId(node: TreeNode): string {
         case 'group': return `group:${node.group}`;
         case 'recipe': return `${node.parentId}/recipe:${node.row.uri}`;
         case 'missing': return `${node.parentId}/missing:${node.name}`;
+        case 'more': return `${node.parentId}/more`;
         case 'expiring': return `expiring:${node.row.item.key}`;
         case 'unreadable': return `unreadable:${node.row.uri}`;
     }
@@ -158,7 +163,13 @@ export function childrenOf(model: ViewModel, node?: TreeNode): TreeNode[] {
         return groupChildren(model, node.group, nodeId(node));
     }
     if (node.kind === 'expiring') {
-        return recipeNodes(node.row.recipes, nodeId(node));
+        const parentId = nodeId(node);
+        const { recipes } = node.row;
+        const nodes = recipeNodes(recipes.slice(0, MAX_RECIPES_PER_ITEM), parentId);
+        if (recipes.length > MAX_RECIPES_PER_ITEM) {
+            nodes.push({ kind: 'more', count: recipes.length - MAX_RECIPES_PER_ITEM, parentId });
+        }
+        return nodes;
     }
     if (node.kind === 'recipe') {
         const parentId = nodeId(node);

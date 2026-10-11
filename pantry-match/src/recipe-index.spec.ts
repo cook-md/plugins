@@ -152,4 +152,19 @@ describe('RecipeIndex', () => {
         await index.refresh();
         assert.strictEqual(ws.renders.length, 2);
     });
+
+    it('looks paths up directly and reports its size', async () => {
+        const ws = new FakeWorkspace();
+        ws.add('a.cook');
+        ws.add('b.cook');
+        const index = new RecipeIndex(ws);
+        assert.strictEqual(index.size(), 0);
+        await index.refresh();
+        assert.strictEqual(index.size(), 2);
+        assert.strictEqual(index.byPath('b.cook')?.path, 'b.cook');
+        assert.strictEqual(index.byPath('nope.cook'), undefined);
+        ws.files = [ws.files[0]];
+        await index.refresh();
+        assert.strictEqual(index.byPath('b.cook'), undefined);
+    });
 });

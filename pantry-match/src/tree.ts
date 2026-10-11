@@ -44,8 +44,10 @@ export class PantryMatchTreeProvider implements vscode.TreeDataProvider<TreeNode
                 const { row } = node;
                 const hasMissing = row.missing.length > 0;
                 const item = new vscode.TreeItem(row.title, hasMissing ? Collapsed : None);
-                item.description = `${row.covered}/${row.total}`;
-                item.tooltip = hasMissing ? `${row.path}\nMissing: ${row.missing.join(', ')}` : `${row.path}\nYou have everything.`;
+                item.description = row.total === 0 ? 'optional' : `${row.covered}/${row.total}`;
+                item.tooltip = row.total === 0
+                    ? `${row.path}\nOnly uses it as an optional ingredient.`
+                    : hasMissing ? `${row.path}\nMissing: ${row.missing.join(', ')}` : `${row.path}\nYou have everything.`;
                 item.resourceUri = vscode.Uri.parse(row.uri);
                 item.contextValue = hasMissing ? 'recipeMissing' : 'recipe';
                 item.command = { command: OPEN_RECIPE_COMMAND, title: 'Open Recipe', arguments: [node] };
@@ -56,6 +58,11 @@ export class PantryMatchTreeProvider implements vscode.TreeDataProvider<TreeNode
                 item.iconPath = new vscode.ThemeIcon('circle-slash');
                 item.tooltip = 'Not in your pantry';
                 item.contextValue = 'missingIngredient';
+                return item;
+            }
+            case 'more': {
+                const item = new vscode.TreeItem(`+${node.count} more`, None);
+                item.contextValue = 'more';
                 return item;
             }
             case 'expiring': {
