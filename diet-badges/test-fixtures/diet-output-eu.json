@@ -29,7 +29,7 @@
         }
       ],
       "categories": [],
-      "plant": false
+      "plant": ""
     },
     {
       "ingredient": "butter",
@@ -58,7 +58,7 @@
         "dairy_and_egg",
         "butter"
       ],
-      "plant": false
+      "plant": ""
     },
     {
       "ingredient": "almond",
@@ -85,7 +85,7 @@
         }
       ],
       "categories": [],
-      "plant": true
+      "plant": "nuts_and_seeds"
     },
     {
       "ingredient": "saffron",
@@ -106,7 +106,7 @@
         }
       ],
       "categories": [],
-      "plant": false
+      "plant": ""
     },
     {
       "ingredient": "soy sauce",
@@ -137,7 +137,7 @@
         }
       ],
       "categories": [],
-      "plant": false
+      "plant": ""
     }
   ],
   "failures": [

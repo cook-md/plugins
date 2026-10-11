@@ -5,7 +5,7 @@ import { ANIMAL_SLUGS, DAIRY_SLUGS, DIET_TEMPLATE, MISALIGNED_NAME, PLANT_SLUGS,
 
 const verified = (...classes: string[]) => ({ status: 'verified', view: 'eu', contains: classes.map(c => ({ class: c, label: c })) });
 const item = (ingredient: string, extra: Record<string, unknown> = {}) =>
-    ({ ingredient, allergens: verified(), warnings: [], categories: [], plant: true, ...extra });
+    ({ ingredient, allergens: verified(), warnings: [], categories: [], plant: 'vegetables', ...extra });
 const raw = (fields: Record<string, unknown>) =>
     JSON.stringify({ names: [], refs: [], missing: [], items: [], failures: [], ...fields });
 
@@ -40,6 +40,9 @@ describe('DIET_TEMPLATE', () => {
         assert.ok(DIET_TEMPLATE.includes('{%- if not placeholder.found -%}'));
         assert.ok(DIET_TEMPLATE.includes('"nutrition_placeholder"'));
         assert.ok(DIET_TEMPLATE.includes('"plant": hit.plant'));
+        assert.ok(DIET_TEMPLATE.includes('{%- set hit.plant = slug -%}'));
+        assert.deepStrictEqual(PLANT_SLUGS.slice(0, 3), ['spices_and_herbs', 'vegetables', 'grains']);
+        assert.strictEqual(PLANT_SLUGS[PLANT_SLUGS.length - 1], 'beverages');
     });
 
     it('stays well under the editor\'s 64 KiB template limit', () => {
@@ -80,9 +83,9 @@ describe('parseDietOutput', () => {
             refs: [],
             missing: [],
             ingredients: [
-                { name: 'butter', status: 'verified', classified: true, allergenClasses: ['milk'], categories: ['dairy_and_egg', 'butter'] },
-                { name: 'unobtainium', status: 'unknown', classified: false, allergenClasses: [], categories: [] },
-                { name: 'tofu', status: 'verified', classified: true, allergenClasses: ['soybeans'], categories: [] },
+                { name: 'butter', canonical: 'butter', status: 'verified', plant: 'vegetables', allergenClasses: ['milk'], categories: ['dairy_and_egg', 'butter'] },
+                { name: 'unobtainium', status: 'unknown', allergenClasses: [], categories: [] },
+                { name: 'tofu', canonical: 'tofu', status: 'verified', plant: 'vegetables', allergenClasses: ['soybeans'], categories: [] },
             ],
         });
     });
@@ -107,7 +110,7 @@ describe('parseDietOutput', () => {
             names: ['butter'],
             items: [item('butter', { allergens: { status: 'verified', view: 'eu', contains: [{ class: 'milk', label: 'Milk' }, { label: 'no class' }] } })],
         }));
-        assert.deepStrictEqual(parsed?.ingredients, [{ name: 'butter', status: 'unknown', classified: true, allergenClasses: ['milk'], categories: [] }]);
+        assert.deepStrictEqual(parsed?.ingredients, [{ name: 'butter', canonical: 'butter', status: 'unknown', plant: 'vegetables', allergenClasses: ['milk'], categories: [] }]);
     });
 
     it('drops category slugs it never asked for', () => {
@@ -115,13 +118,13 @@ describe('parseDietOutput', () => {
         assert.deepStrictEqual(parsed?.ingredients[0].categories, ['dairy_and_egg', 'milk']);
     });
 
-    it('treats an item with no animal category and no plant group as unclassified, and a missing plant flag as false', () => {
+    it('keeps the plant group the template found, and drops a missing, empty or non-slug one', () => {
         const parsed = parseDietOutput(raw({
             names: ['pancetta', 'onion', 'bacon'],
-            items: [item('pancetta', { plant: false }), item('onion'), { ingredient: 'bacon', allergens: verified(), warnings: [], categories: [] }],
+            items: [item('pancetta', { plant: '' }), item('onion'), { ingredient: 'bacon', allergens: verified(), warnings: [], categories: [], plant: true }],
         }));
-        assert.deepStrictEqual(parsed?.ingredients.map(i => [i.name, i.status, i.classified]), [
-            ['pancetta', 'verified', false], ['onion', 'verified', true], ['bacon', 'verified', false],
+        assert.deepStrictEqual(parsed?.ingredients.map(i => [i.name, i.status, i.plant]), [
+            ['pancetta', 'verified', undefined], ['onion', 'verified', 'vegetables'], ['bacon', 'verified', undefined],
         ]);
     });
 
@@ -133,8 +136,8 @@ describe('parseDietOutput', () => {
     it('falls back to service names, plus a stand-in, when items and failures do not line up', () => {
         const parsed = parseDietOutput(raw({ names: ['a', 'b', 'c'], items: [item('A')] }));
         assert.deepStrictEqual(parsed?.ingredients, [
-            { name: 'A', status: 'verified', classified: true, allergenClasses: [], categories: [] },
-            { name: MISALIGNED_NAME, status: 'unknown', classified: false, allergenClasses: [], categories: [] },
+            { name: 'A', canonical: 'A', status: 'verified', plant: 'vegetables', allergenClasses: [], categories: [] },
+            { name: MISALIGNED_NAME, status: 'unknown', allergenClasses: [], categories: [] },
         ]);
     });
 

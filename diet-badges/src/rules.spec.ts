@@ -1,10 +1,10 @@
 import * as assert from 'assert';
-import { CategorySlug, DietIngredient, DietOutput } from './diet-template';
+import { CategorySlug, DietIngredient, DietOutput, PlantSlug } from './diet-template';
 import { DietVerdicts, NON_PESCATARIAN_WORDS, NON_VEGAN_WORDS, NON_VEGETARIAN_WORDS, evaluateDiets } from './rules';
 import { DIET_IDS } from './settings';
 
-const ing = (name: string, options: { categories?: CategorySlug[]; allergens?: string[]; unknown?: boolean; unclassified?: boolean } = {}): DietIngredient =>
-    ({ name, status: options.unknown ? 'unknown' : 'verified', classified: !options.unclassified, allergenClasses: options.allergens ?? [], categories: options.categories ?? [] });
+const ing = (name: string, options: { categories?: CategorySlug[]; allergens?: string[]; unknown?: boolean; unclassified?: boolean; plant?: PlantSlug; canonical?: string } = {}): DietIngredient =>
+    ({ name, ...(options.canonical ? { canonical: options.canonical } : {}), status: options.unknown ? 'unknown' : 'verified', ...(options.unclassified ? {} : { plant: options.plant ?? 'vegetables' }), allergenClasses: options.allergens ?? [], categories: options.categories ?? [] });
 const output = (ingredients: DietIngredient[], extra: { refs?: string[]; missing?: string[] } = {}): DietOutput =>
     ({ names: ingredients.map(i => i.name), refs: extra.refs ?? [], missing: extra.missing ?? [], ingredients });
 /** Vegan, Vegetarian, Pescatarian, Dairy-free. */
@@ -104,6 +104,54 @@ describe('evaluateDiets', () => {
         assert.deepStrictEqual(statuses(verdicts), ['fail', 'fail', 'fail', 'pass']);
         assert.deepStrictEqual(verdicts.pescatarian.violations, [{ ingredient: 'bacon', reason: 'bacon' }]);
         assert.deepStrictEqual(verdicts.vegetarian.unknown, ['honey']);
+    });
+
+    it('does not fail meat words that are part of a plant name', () => {
+        for (const name of ['beef tomatoes', 'Beefsteak tomato', 'lamb\'s lettuce', 'Lamb’s lettuce', 'lambs lettuce', 'chicken of the woods', 'hen of the woods', 'duck sauce', 'cauliflower steak']) {
+            assert.deepStrictEqual(statuses(evaluateDiets(output([ing(name)]), [])), ['pass', 'pass', 'pass', 'pass'], name);
+        }
+    });
+
+    it('turns a meat or fish word into unknown, not fail, next to an analogue qualifier', () => {
+        for (const name of ['vegan sausage', 'coconut bacon', 'chicken-style stock powder', 'crumbled vegan sausage', 'mushroom jerky ham', 'plant-based mince beef', 'tofu bacon', 'meatless lardons']) {
+            const verdicts = evaluateDiets(output([ing(name)]), []);
+            assert.deepStrictEqual(statuses(verdicts), ['unknown', 'unknown', 'unknown', 'pass'], name);
+            assert.deepStrictEqual(verdicts.vegan.violations, [], name);
+        }
+        // Fish words only reach Vegetarian and Vegan, so a pescatarian stays clean.
+        for (const name of ['vegan worcestershire sauce', 'vegan fish sauce', 'faux anchovies']) {
+            assert.deepStrictEqual(statuses(evaluateDiets(output([ing(name)]), [])), ['unknown', 'unknown', 'pass', 'pass'], name);
+        }
+    });
+
+    it('lets categories and allergens beat a qualifier', () => {
+        const verdicts = evaluateDiets(output([ing('vegan sausage', { categories: ['meat'] })]), []);
+        assert.deepStrictEqual(statuses(verdicts), ['fail', 'fail', 'fail', 'pass']);
+    });
+
+    it('does not treat steak as a meat word: a salmon steak fails Vegetarian by category and passes Pescatarian', () => {
+        const verdicts = evaluateDiets(output([ing('salmon steak', { categories: ['fish_and_shellfish'] })]), []);
+        assert.deepStrictEqual(statuses(verdicts), ['fail', 'fail', 'pass', 'pass']);
+        assert.ok(!NON_PESCATARIAN_WORDS.includes('steak'));
+    });
+
+    it('fails only Vegan on a duck egg, through the eggs allergen', () => {
+        const verdicts = evaluateDiets(output([ing('duck eggs', { allergens: ['eggs'], categories: ['dairy_and_egg'] })]), []);
+        assert.deepStrictEqual(statuses(verdicts), ['fail', 'pass', 'pass', 'pass']);
+        assert.deepStrictEqual(verdicts.vegan.violations, [{ ingredient: 'duck eggs', reason: 'eggs' }]);
+    });
+
+    it('also matches words against the service\'s canonical name', () => {
+        const pork = evaluateDiets(output([ing('mince', { canonical: 'Pork mince' })]), []);
+        assert.deepStrictEqual(statuses(pork), ['fail', 'fail', 'fail', 'pass']);
+        const vegan = evaluateDiets(output([ing('sausage', { canonical: 'Sausage, vegan' })]), []);
+        assert.deepStrictEqual(statuses(vegan), ['unknown', 'unknown', 'unknown', 'pass']);
+    });
+
+    it('accepts beverages as plant-based for Vegetarian and Pescatarian but not Vegan (wine and beer fining)', () => {
+        const verdicts = evaluateDiets(output([ing('white wine', { plant: 'beverages' })]), []);
+        assert.deepStrictEqual(statuses(verdicts), ['unknown', 'pass', 'pass', 'pass']);
+        assert.deepStrictEqual(verdicts.vegan.unknown, ['white wine']);
     });
 
     it('fails only Vegan on the user\'s extra words', () => {
