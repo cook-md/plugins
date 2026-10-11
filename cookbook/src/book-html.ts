@@ -92,18 +92,21 @@ blockquote { border-left: 0.8mm solid #d8d8d0; margin: 3mm 0; padding-left: 4mm;
 .toc li { margin: 1.4mm 0; }
 .toc-chapter > a { font-weight: 600; }
 .chapter, .recipe, .index, .appendix { break-before: page; page-break-before: always; }
-.chapter-title { font-size: 26pt; margin: 30mm 0 8mm; }
+.chapter-title + .recipe { break-before: auto; page-break-before: auto; }
+.chapter-title + .chapter:not(.has-intro) { break-before: auto; page-break-before: auto; }
+.chapter-title { font-size: 26pt; margin: 12mm 0 8mm; break-after: avoid; page-break-after: avoid; }
 .depth-2 > .chapter-title { font-size: 21pt; }
 .depth-3 > .chapter-title { font-size: 17pt; }
 .recipe-title { font-size: 20pt; margin: 0 0 4mm; }
-.title-image { display: block; width: 100%; max-height: 110mm; object-fit: cover; margin: 0 0 4mm; border-radius: 2mm; }
+.title-image { display: block; width: 100%; max-height: 90mm; object-fit: cover; margin: 0 0 4mm; border-radius: 2mm; }
 .meta, .source, .tags, .nutrition { font-size: 9.5pt; color: #4a4a45; margin: 1mm 0; }
 .tag { border: 0.3mm solid #c9c9c2; border-radius: 3mm; padding: 0 2mm; }
 .nutrition { font-weight: 600; }
+h3, .section-name { break-after: avoid; page-break-after: avoid; }
 h3 { font-size: 11pt; text-transform: uppercase; letter-spacing: 0.06em; margin: 6mm 0 2mm; }
 .section-name { font-size: 11pt; margin: 4mm 0 2mm; }
 .ingredients { break-inside: avoid; page-break-inside: avoid; }
-.ingredients ul, .cookware ul { columns: 2; column-gap: 8mm; padding-left: 4mm; margin: 0; }
+.ingredients ul, .cookware ul { columns: 2; column-gap: 8mm; padding-left: 6mm; margin: 0; }
 .qty { font-weight: 600; }
 .note, .optional { color: #6b6b66; }
 .optional { font-style: italic; font-size: 9pt; }
@@ -143,7 +146,7 @@ export function buildBookHtml(input: BookHtmlInput): string {
         const level = Math.min(chapter.depth, 3);
         const intro = chapter.readme !== undefined ? intros.get(chapter.readme) : undefined;
         return [
-            `<section class="chapter depth-${chapter.depth}" id="${chapterId.get(chapter.path)}">`,
+            `<section class="chapter depth-${chapter.depth}${intro !== undefined ? ' has-intro' : ''}" id="${chapterId.get(chapter.path)}">`,
             `<h${level} class="chapter-title">${escapeHtml(chapter.title)}</h${level}>`,
             ...(intro !== undefined ? [`<div class="intro">${intro}</div>`] : []),
             ...recipeHtml(chapter.recipes),

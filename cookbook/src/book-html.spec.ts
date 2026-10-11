@@ -61,8 +61,34 @@ describe('bookIntros', () => {
 describe('bookCss', () => {
     it('sets the page size and breaks pages before chapters and recipes', () => {
         assert.ok(bookCss('Letter').includes('@page { size: Letter;'));
-        assert.ok(bookCss('A4').includes('.chapter, .recipe, .index, .appendix { break-before: page; page-break-before: always; }'));
-        assert.ok(bookCss('A4').includes('.ingredients { break-inside: avoid;'));
+        const css = bookCss('A4');
+        assert.ok(css.includes('.chapter, .recipe, .index, .appendix { break-before: page; page-break-before: always; }'));
+        assert.ok(css.includes('.ingredients { break-inside: avoid;'));
+    });
+
+    it('lets a chapter heading without an intro share its page with what follows', () => {
+        const css = bookCss('A4');
+        assert.ok(css.includes('.chapter-title + .recipe { break-before: auto; page-break-before: auto; }'));
+        assert.ok(css.includes('.chapter-title + .chapter:not(.has-intro) { break-before: auto; page-break-before: auto; }'));
+    });
+
+    it('keeps headings with their content and never forces the method onto a new page', () => {
+        const css = bookCss('A4');
+        assert.ok(css.includes('h3, .section-name { break-after: avoid; page-break-after: avoid; }'));
+        assert.ok(css.includes('.step { position: relative; padding-left: 9mm; margin: 0 0 2.5mm; break-inside: avoid;'));
+        assert.ok(!/\.method\s*\{[^}]*break-(before|inside)/.test(css));
+        assert.ok(css.includes('max-height: 90mm'));
+        assert.ok(css.includes('padding-left: 6mm'));
+    });
+
+    it('marks chapters that have an intro', () => {
+        const book = tree(['A/README.md', 'A/a.cook', 'B/b.cook'], { 'A/README.md': 'Hi' });
+        const html = buildBookHtml(input({
+            tree: book, intros: new Map([['A/README.md', '<p>Hi</p>']]),
+            recipes: new Map([['A/a.cook', recipe('r-1', 'A/a.cook', 'A1')], ['B/b.cook', recipe('r-2', 'B/b.cook', 'B1')]]),
+        }));
+        assert.ok(html.includes('<section class="chapter depth-1 has-intro" id="c-1">'));
+        assert.ok(html.includes('<section class="chapter depth-1" id="c-2">'));
     });
 });
 
