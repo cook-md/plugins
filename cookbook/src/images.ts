@@ -101,14 +101,22 @@ export class ImageInliner {
             if (size === undefined) {
                 return undefined;
             }
-            // Base64 is 4 characters per 3 bytes.
-            if (size > this.maxBytes || this.used + Math.ceil(size / 3) * 4 > this.budget) {
+            // Base64 is 4 characters per 3 bytes, plus the `data:<mime>;base64,` prefix. The budget
+            // is checked and reserved in one synchronous step, so concurrent loads can't all pass.
+            const reserved = Math.ceil(size / 3) * 4 + `data:${mime};base64,`.length;
+            if (size > this.maxBytes || this.used + reserved > this.budget) {
                 this.skipped++;
                 return undefined;
             }
-            const dataUri = toDataUri(await this.files.read(uri), mime);
-            this.used += dataUri.length;
-            return dataUri;
+            this.used += reserved;
+            try {
+                const dataUri = toDataUri(await this.files.read(uri), mime);
+                this.used += dataUri.length - reserved;
+                return dataUri;
+            } catch (error) {
+                this.used -= reserved;
+                throw error;
+            }
         } catch {
             return undefined;
         }

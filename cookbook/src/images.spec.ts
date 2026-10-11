@@ -65,6 +65,40 @@ describe('ImageInliner', () => {
         assert.strictEqual(inliner.skipped, 2);
     });
 
+    it('never exceeds the budget with concurrent loads and releases a reservation when the read fails', async () => {
+        const bytes = new Uint8Array(30);
+        const contents: Record<string, Uint8Array> = {};
+        for (let n = 0; n < 6; n++) {
+            contents[`file:///b/${n}.jpg`] = bytes;
+        }
+        const slow: ImageFiles = {
+            size: async uri => contents[uri]?.length,
+            read: async uri => {
+                await new Promise(resolve => setTimeout(resolve, 5));
+                return contents[uri];
+            },
+        };
+        // One 30-byte image is 40 base64 characters plus the 23-character data: prefix.
+        const one = toDataUri(bytes, 'image/jpeg').length;
+        const inliner = new ImageInliner(slow, 1000, one * 2 + 5);
+        const results = await Promise.all(Object.keys(contents).map(uri => inliner.inline(uri)));
+        assert.strictEqual(results.filter(result => result !== undefined).length, 2);
+        assert.strictEqual(inliner.skipped, 4);
+
+        const failing: ImageFiles = {
+            size: async () => 30,
+            read: async uri => {
+                if (uri.endsWith('bad.jpg')) {
+                    throw new Error('boom');
+                }
+                return bytes;
+            },
+        };
+        const retry = new ImageInliner(failing, 1000, one + 5);
+        assert.strictEqual(await retry.inline('file:///b/bad.jpg'), undefined);
+        assert.ok(await retry.inline('file:///b/good.jpg'));
+    });
+
     it('inlines a whole RecipeImages result and drops what it cannot inline', async () => {
         const fs = files({ 'file:///b/t.jpg': new Uint8Array([0]), 'file:///b/t.0.jpg': new Uint8Array([1]) });
         const inliner = new ImageInliner(fs);
