@@ -67,9 +67,10 @@ export const ANALOGUE_QUALIFIERS: readonly string[] = [
 ];
 /**
  * Ingredients that are also real foods ("coconut chicken curry", "chicken and mushroom soup"), so
- * they only mark an analogue next to a cured-meat word that they commonly imitate ("coconut bacon").
+ * they only mark an analogue directly before a cured-meat word that they commonly imitate ("coconut bacon").
  */
 export const WEAK_QUALIFIERS: readonly string[] = ['coconut', 'mushroom', 'soy'];
+const CONJUNCTIONS: readonly string[] = ['and', 'or', '&', 'with'];
 export const IMITATED_WORDS: readonly string[] = [
     'bacon', 'lardons', 'ham', 'pancetta', 'guanciale', 'prosciutto', 'chorizo', 'salami', 'sausage', 'pepperoni', 'mortadella', 'bresaola',
 ];
@@ -150,17 +151,26 @@ function isQualifiedHit(text: string, word: string): boolean {
         return false;
     }
     const before = text.slice(0, range.index).split(/\s+/).filter(token => token !== '');
+    // Strong qualifiers may have one word between them and the matched word, but not a conjunction
+    // ("veggie and chicken stir fry"). Weak ones must sit directly before it.
+    const sizeOf = (qualifier: string): number => qualifier.split(/\s+/).length;
+    const directlyBefore = (qualifier: string): boolean => matchesWord(qualifier, before.slice(-sizeOf(qualifier)).join(' '));
     const precedes = (qualifier: string): boolean => {
-        const size = qualifier.split(/\s+/).length + 1;
-        return matchesWord(qualifier, before.slice(-size).join(' '));
+        if (directlyBefore(qualifier)) {
+            return true;
+        }
+        const window = before.slice(-(sizeOf(qualifier) + 1));
+        const between = window[window.length - 1];
+        return window.length > sizeOf(qualifier) && !CONJUNCTIONS.includes(between.toLowerCase())
+            && matchesWord(qualifier, window.slice(0, -1).join(' '));
     };
     if (ANALOGUE_QUALIFIERS.some(precedes)) {
         return true;
     }
-    if (IMITATED_WORDS.some(imitated => matchesWord(imitated, word)) && WEAK_QUALIFIERS.some(precedes)) {
+    if (IMITATED_WORDS.some(imitated => matchesWord(imitated, word)) && WEAK_QUALIFIERS.some(directlyBefore)) {
         return true;
     }
-    return /^(?:-|\s+)(?:style|free)(?![\p{L}\p{N}])/iu.test(text.slice(range.end));
+    return /^(?:-|\s+)(?:style(?![\p{L}\p{N}])|free(?![\p{L}\p{N}])(?![\s-]*range))/iu.test(text.slice(range.end));
 }
 
 /**

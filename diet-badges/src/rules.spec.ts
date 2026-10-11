@@ -113,7 +113,7 @@ describe('evaluateDiets', () => {
     });
 
     it('turns a meat or fish word into unknown, not fail, next to an analogue qualifier', () => {
-        for (const name of ['vegan sausage', 'coconut bacon', 'chicken-style stock powder', 'crumbled vegan sausage', 'mushroom jerky ham', 'plant-based mince beef', 'tofu bacon', 'meatless lardons']) {
+        for (const name of ['vegan sausage', 'coconut bacon', 'chicken-style stock powder', 'crumbled vegan sausage', 'mushroom bacon', 'plant-based mince beef', 'tofu bacon', 'meatless lardons']) {
             const verdicts = evaluateDiets(output([ing(name)]), []);
             assert.deepStrictEqual(statuses(verdicts), ['unknown', 'unknown', 'unknown', 'pass'], name);
             assert.deepStrictEqual(verdicts.vegan.violations, [], name);
@@ -125,7 +125,7 @@ describe('evaluateDiets', () => {
     });
 
     it('keeps failing real dishes where a qualifier word is not attached to the meat word', () => {
-        for (const [name, reason] of [['chicken and mushroom soup', 'chicken'], ['country-style pork ribs', 'pork'], ['coconut chicken curry', 'chicken'], ['soy sauce marinated bacon', 'bacon'], ['bacon, mushroom and tofu pie', 'bacon']]) {
+        for (const [name, reason] of [['chicken and mushroom soup', 'chicken'], ['country-style pork ribs', 'pork'], ['coconut chicken curry', 'chicken'], ['soy sauce marinated bacon', 'bacon'], ['veggie and chicken stir fry', 'chicken'], ['veggie & chicken stir fry', 'chicken'], ['tofu with bacon bits', 'bacon'], ['soy glazed ham hock', 'ham'], ['chicken free range thighs', 'chicken'], ['chicken free-range thighs', 'chicken'], ['bacon, mushroom and tofu pie', 'bacon']]) {
             const verdicts = evaluateDiets(output([ing(name)]), []);
             assert.deepStrictEqual(statuses(verdicts), ['fail', 'fail', 'fail', 'pass'], name);
             assert.deepStrictEqual(verdicts.pescatarian.violations, [{ ingredient: name, reason }], name);
