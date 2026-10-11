@@ -7,7 +7,7 @@ import {
     BookTree, RecipeEntry, buildBookTree, chaptersInOrder, compareNames, isExcluded, readmePaths, recipesInOrder, resolveRelativeImage,
 } from './book-tree';
 import { CooklangApi, RecipeImages } from './cooklang-api';
-import { ImageFiles, ImageInliner } from './images';
+import { ImageFiles, ImageInliner, MAX_IMAGE_BYTES } from './images';
 import { IndexedRecipe, buildIngredientIndex } from './ingredient-index';
 import { markdownImageSources } from './markdown';
 import { NUTRITION_TEMPLATE, nutritionLine, parseNutritionOutput, servingsFromMetadata } from './nutrition-line';
@@ -18,6 +18,9 @@ import { CookbookSettings } from './settings';
 /** Fail fast above this: keeps the HTML well under the editor's 100 M character export limit. */
 export const MAX_RECIPES = 500;
 export const RENDER_CONCURRENCY = 4;
+/** The editor rejects export HTML over 100 M characters. */
+export const MAX_HTML_CHARS = 100 * 1024 * 1024;
+export const TOO_LARGE_MESSAGE = 'This book is too large to export as one PDF. Export a subfolder instead.';
 export const EDITOR_DOWNLOAD_URL = 'https://cook.md/editor';
 export const UPDATE_MESSAGE = 'Update Cook Editor to export cookbooks.';
 export const UPDATE_ACTION = 'Get Cook Editor';
@@ -60,6 +63,7 @@ export type ExportOutcome =
     | { status: 'empty' }
     | { status: 'tooLarge'; count: number }
     | { status: 'cancelled' }
+    | { status: 'busy' }
     | { status: 'notSaved' }
     | { status: 'failed'; error: string }
     | { status: 'saved'; path?: string; notIncluded: number };
@@ -68,7 +72,8 @@ type RecipeRender = { recipe: RenderedRecipe; indexed: IndexedRecipe } | { failu
 
 /** `<Book title>.pdf` without path separators, control or reserved characters, at most 200 characters. */
 export function pdfFileName(title: string): string {
-    const base = title.replace(/[\u0000-\u001f\u007f\\/:*?"<>|]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 196).trim();
+    const cleaned = title.replace(/[\u0000-\u001f\u007f\\/:*?"<>|#]/g, ' ').replace(/\s+/g, ' ').trim();
+    const base = Array.from(cleaned).slice(0, 196).join('').trim();
     return `${base === '' ? 'Cookbook' : base}.pdf`;
 }
 
@@ -114,9 +119,26 @@ export class CookbookExporter {
         protected readonly ui: CookbookUi,
         protected readonly settings: () => CookbookSettings,
         protected readonly today: () => string = () => new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
+        protected readonly maxHtmlChars: number = MAX_HTML_CHARS,
     ) { }
 
+    protected running = false;
+
+    /** One export at a time: a second request while one runs is turned away. */
     async export(folder: BookFolder): Promise<ExportOutcome> {
+        if (this.running) {
+            void this.ui.showInformation('A cookbook export is already running.');
+            return { status: 'busy' };
+        }
+        this.running = true;
+        try {
+            return await this.run(folder);
+        } finally {
+            this.running = false;
+        }
+    }
+
+    protected async run(folder: BookFolder): Promise<ExportOutcome> {
         const missing = await this.api.missingCommands();
         if (missing.length > 0) {
             void this.ui.showWarning(UPDATE_MESSAGE, UPDATE_ACTION).then(choice => {
@@ -145,14 +167,17 @@ export class CookbookExporter {
             void this.ui.showWarning(`${folder.name} has ${entries.length} recipes; a cookbook holds up to ${MAX_RECIPES}. Export a subfolder instead.`);
             return { status: 'tooLarge', count: entries.length };
         }
-        const nutrition = { enabled: settings.nutrition && await this.api.hasFeature('nutrition_api') };
+        const nutrition = { enabled: settings.nutrition && await this.api.hasFeature('nutrition_api'), unavailable: 0 };
         const inliner = new ImageInliner(this.workspace.images);
         const ids = recipeIds(tree);
 
+        let unavailable = 0;
         let result: { saved: { saved: boolean; path?: string; error?: string }; notIncluded: number } | undefined;
         try {
             result = await this.ui.withProgress('Cookbook', async (report, token) => {
                 let done = 0;
+                // README photos first, so a tight image budget drops recipe photos before the cover's.
+                const images = await this.readmeImages(folder, tree, readmes, inliner);
                 report(`Rendering 0/${entries.length} recipes…`);
                 const renders = await mapLimit(entries, RENDER_CONCURRENCY, async entry => {
                     const render = await this.renderRecipe(folder, entry, ids.get(entry.path)!, inliner, nutrition);
@@ -177,7 +202,6 @@ export class CookbookExporter {
                         indexed.push(render.indexed);
                     }
                 }
-                const images = await this.readmeImages(folder, tree, readmes, inliner);
                 const html = buildBookHtml({
                     tree, recipes, notIncluded,
                     intros: bookIntros(tree, readmes, (readme, src) => images.get(`${readme}\n${src}`)),
@@ -185,16 +209,21 @@ export class CookbookExporter {
                     generatedOn: this.today(),
                     pageSize: settings.pageSize,
                 });
+                inliner.clear();
                 if (token.isCancellationRequested) {
                     return undefined;
                 }
+                if (html.length > this.maxHtmlChars) {
+                    throw new Error(TOO_LARGE_MESSAGE);
+                }
                 report('Creating the PDF…');
                 const saved = await this.api.exportPdf({ html, defaultFileName: pdfFileName(tree.title), pageSize: settings.pageSize });
+                unavailable = nutrition.unavailable;
                 return { saved, notIncluded: notIncluded.length };
             });
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
-            void this.ui.showError(`Could not export the cookbook: ${message}`);
+            void this.ui.showError(message === TOO_LARGE_MESSAGE ? message : `Could not export the cookbook: ${message}`);
             return { status: 'failed', error: message };
         }
         if (result === undefined) {
@@ -219,13 +248,16 @@ export class CookbookExporter {
             void this.ui.showWarning(`${notIncluded} recipe${notIncluded === 1 ? '' : 's'} could not be rendered. See "Not included" at the end of the book.`);
         }
         if (inliner.skipped > 0) {
-            void this.ui.showWarning(`${inliner.skipped} photo${inliner.skipped === 1 ? ' was' : 's were'} left out: over 10 MB, or the book reached its size limit.`);
+            void this.ui.showWarning(`${inliner.skipped} photo${inliner.skipped === 1 ? ' was' : 's were'} left out: over ${Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB, or the book reached its size limit.`);
+        }
+        if (unavailable > 0) {
+            void this.ui.showWarning(`${unavailable} recipe${unavailable === 1 ? ' has' : 's have'} no nutrition line because the nutrition service could not be reached.`);
         }
         return { status: 'saved', ...(path !== undefined ? { path } : {}), notIncluded };
     }
 
     protected async renderRecipe(
-        folder: BookFolder, entry: RecipeEntry, id: string, inliner: ImageInliner, nutrition: { enabled: boolean },
+        folder: BookFolder, entry: RecipeEntry, id: string, inliner: ImageInliner, nutrition: { enabled: boolean; unavailable: number },
     ): Promise<RecipeRender> {
         const uri = this.workspace.uriOf(folder, entry.path);
         try {
@@ -257,12 +289,14 @@ export class CookbookExporter {
     }
 
     /** Any failure leaves the line out; an auth or plan failure turns nutrition off for the rest of the book. */
-    protected async nutritionLine(uri: string, metadata: Record<string, unknown>, nutrition: { enabled: boolean }): Promise<string | undefined> {
+    protected async nutritionLine(uri: string, metadata: Record<string, unknown>, nutrition: { enabled: boolean; unavailable: number }): Promise<string | undefined> {
         try {
             const result = await this.api.renderReport({ uri, template: NUTRITION_TEMPLATE });
             if (!result.ok) {
                 if (result.reason === 'unauthenticated' || result.reason === 'forbidden') {
                     nutrition.enabled = false;
+                } else if (result.reason === 'network' || result.reason === 'server') {
+                    nutrition.unavailable++;
                 }
                 return undefined;
             }

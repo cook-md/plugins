@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import { CooklangApi, ExportPdfArgs, REQUIRED_COMMANDS } from './cooklang-api';
 import {
-    BookFolder, CookbookExporter, CookbookUi, CookbookWorkspace, EDITOR_DOWNLOAD_URL, MAX_RECIPES, UPDATE_MESSAGE,
+    BookFolder, CookbookExporter, CookbookUi, CookbookWorkspace, EDITOR_DOWNLOAD_URL, MAX_RECIPES, TOO_LARGE_MESSAGE, UPDATE_MESSAGE,
     folderChoices, mapLimit, pdfFileName,
 } from './export-command';
 import { CookbookSettings } from './settings';
@@ -41,6 +41,9 @@ interface Options {
     choice?: string;
     cancelAfter?: number;
     settings?: Partial<CookbookSettings>;
+    exportThrows?: string;
+    maxHtmlChars?: number;
+    imageBytes?: number;
 }
 
 function fixture(options: Options = {}): Fixture {
@@ -62,6 +65,9 @@ function fixture(options: Options = {}): Fixture {
             case 'cooklang.api.recipeImages':
                 return options.images?.[arg.uri] ?? { steps: {} };
             case 'cooklang.api.exportPdf':
+                if (options.exportThrows !== undefined) {
+                    throw new Error(options.exportThrows);
+                }
                 return options.exportResult ?? { saved: true, path: '/Users/me/Book.pdf' };
         }
         throw new Error(`unexpected ${command}`);
@@ -71,8 +77,8 @@ function fixture(options: Options = {}): Fixture {
         uriOf: (folder, path) => `${folder.uri}/${path.split('/').map(encodeURIComponent).join('/')}`,
         readText: async uri => files[decodeURIComponent(uri.slice(FOLDER.uri.length + 1))],
         images: {
-            size: async uri => (uri.endsWith('.jpg') ? 3 : undefined),
-            read: async () => new Uint8Array([1, 2, 3]),
+            size: async uri => (uri.endsWith('.jpg') ? options.imageBytes ?? 3 : undefined),
+            read: async () => (options.imageBytes === undefined ? new Uint8Array([1, 2, 3]) : new Uint8Array(options.imageBytes)),
         },
     };
     const state = { messages: [] as string[], opened: [] as string[], progress: [] as string[] };
@@ -86,7 +92,7 @@ function fixture(options: Options = {}): Fixture {
         openExternal: async url => { state.opened.push(url); },
         openFile: async path => { state.opened.push(`file:${path}`); },
     };
-    const exporter = new CookbookExporter(api, workspace, ui, () => ({ ...SETTINGS, ...options.settings }), () => '10 October 2026');
+    const exporter = new CookbookExporter(api, workspace, ui, () => ({ ...SETTINGS, ...options.settings }), () => '10 October 2026', options.maxHtmlChars);
     const exported = (): ExportPdfArgs | undefined => calls.find(call => call.command === 'cooklang.api.exportPdf')?.args[0] as ExportPdfArgs | undefined;
     return { exporter, calls, ui: state, exported };
 }
@@ -99,6 +105,10 @@ describe('pdfFileName', () => {
         assert.strictEqual(pdfFileName('a\u0000b'), 'a b.pdf');
         assert.strictEqual(pdfFileName(' ?? '), 'Cookbook.pdf');
         assert.strictEqual(pdfFileName('x'.repeat(300)).length, 200);
+        assert.strictEqual(pdfFileName('Book #1').includes('#'), false);
+        const emoji = Array.from(pdfFileName('🍝'.repeat(300))).length;
+        assert.strictEqual(emoji, 200);
+        assert.ok(!/[\ud800-\udbff]$/.test(pdfFileName('🍝'.repeat(300)).slice(0, -4)));
     });
 });
 
@@ -241,6 +251,78 @@ describe('CookbookExporter', () => {
         const failed = fixture({ files: { 'a.cook': '' }, exportResult: { saved: false, error: 'Disk full' } });
         assert.deepStrictEqual(await failed.exporter.export(FOLDER), { status: 'failed', error: 'Disk full' });
         assert.deepStrictEqual(failed.ui.messages, ['error: Could not export the cookbook: Disk full']);
+    });
+
+    it('refuses to export HTML over the editor limit with a friendly message', async () => {
+        const { exporter, exported, ui } = fixture({ files: { 'a.cook': '' }, maxHtmlChars: 1000 });
+        assert.deepStrictEqual(await exporter.export(FOLDER), { status: 'failed', error: TOO_LARGE_MESSAGE });
+        assert.strictEqual(exported(), undefined);
+        assert.deepStrictEqual(ui.messages, [`error: ${TOO_LARGE_MESSAGE}`]);
+        assert.strictEqual(TOO_LARGE_MESSAGE, 'This book is too large to export as one PDF. Export a subfolder instead.');
+    });
+
+    it('reports a throwing exportPdf as failed with an error toast', async () => {
+        const { exporter, ui } = fixture({ files: { 'a.cook': '' }, exportThrows: 'Invalid arguments: html' });
+        assert.deepStrictEqual(await exporter.export(FOLDER), { status: 'failed', error: 'Invalid arguments: html' });
+        assert.deepStrictEqual(ui.messages, ['error: Could not export the cookbook: Invalid arguments: html']);
+    });
+
+    it('warns once about photos left out, naming the 10 MB cap', async () => {
+        const { exporter, ui } = fixture({
+            files: { 'a.cook': '' }, imageBytes: 11 * 1024 * 1024,
+            images: { 'file:///ws/Book/a.cook': { title: 'file:///ws/Book/a.jpg', steps: {} } },
+        });
+        await exporter.export(FOLDER);
+        await tick();
+        assert.ok(ui.messages.includes('warning: 1 photo was left out: over 10 MB, or the book reached its size limit. []'));
+    });
+
+    it('warns once when nutrition lines are missing because the service failed', async () => {
+        const { exporter, ui } = fixture({
+            files: { 'a.cook': '', 'b.cook': '', 'c.cook': '' }, hasFeature: true,
+            nutrition: { ok: false, reason: 'server', message: 'Bad gateway' },
+        });
+        await exporter.export(FOLDER);
+        await tick();
+        const warnings = ui.messages.filter(message => message.includes('nutrition'));
+        assert.deepStrictEqual(warnings, ['warning: 3 recipes have no nutrition line because the nutrition service could not be reached. []']);
+    });
+
+    it('opens the saved file when asked', async () => {
+        const { exporter, ui } = fixture({ files: { 'a.cook': '' }, choice: 'Open' });
+        await exporter.export(FOLDER);
+        await tick();
+        assert.deepStrictEqual(ui.opened, ['file:/Users/me/Book.pdf']);
+    });
+
+    it('does not export when cancelled after the last render', async () => {
+        const { exporter, exported, ui } = fixture({ files: { 'a.cook': '' }, cancelAfter: 1 });
+        assert.deepStrictEqual(await exporter.export(FOLDER), { status: 'cancelled' });
+        assert.strictEqual(exported(), undefined);
+        assert.deepStrictEqual(ui.messages, []);
+    });
+
+    it('refuses a second export while one is running', async () => {
+        const { exporter, ui } = fixture({ files: { 'a.cook': '' } });
+        const first = exporter.export(FOLDER);
+        assert.deepStrictEqual(await exporter.export(FOLDER), { status: 'busy' });
+        assert.strictEqual((await first).status, 'saved');
+        assert.ok(ui.messages.includes('info: A cookbook export is already running. []'));
+        assert.strictEqual((await exporter.export(FOLDER)).status, 'saved');
+    });
+
+    it('inlines README images before the recipes so they are the last to be dropped', async () => {
+        const order: string[] = [];
+        const { exporter } = fixture({ files: { 'README.md': '![Cover](cover.jpg)', 'a.cook': '' } });
+        const original = (exporter as unknown as { workspace: CookbookWorkspace }).workspace;
+        const read = original.images.read;
+        original.images.read = async uri => { order.push(`image:${uri}`); return read(uri); };
+        const api = (exporter as unknown as { api: CooklangApi }).api;
+        const render = api.renderReport.bind(api);
+        api.renderReport = async args => { order.push('render'); return render(args); };
+        await exporter.export(FOLDER);
+        assert.deepStrictEqual(order[0].startsWith('image:'), true);
+        assert.ok(order.indexOf('render') > 0);
     });
 
     it('passes the Letter page size through', async () => {
