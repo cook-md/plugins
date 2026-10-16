@@ -81,7 +81,9 @@ export function isPlaceholder(item: NutritionItem): boolean {
 export const MACROS_TEMPLATE = [
     '{%- if plan is defined -%}',
     '{%- set agg = aggregate_nutrition(plan.all_ingredients) -%}',
-    '{%- set days = (plan.days | length) if (plan.days | length) > 0 else 1 -%}',
+    // Count only day sections (a date, or "day" in the header); fall back to every section.
+    '{%- set dns = namespace(n=0) -%}{%- for d in plan.days -%}{%- if (d.date is defined and d.date) or (d.name is defined and d.name and "day" in (d.name | lower)) -%}{%- set dns.n = dns.n + 1 -%}{%- endif -%}{%- endfor -%}',
+    '{%- set days = dns.n if dns.n > 0 else ((plan.days | length) if (plan.days | length) > 0 else 1) -%}',
     '{%- set people = plan.servings if (plan.servings is defined and plan.servings is not none and plan.servings is number and plan.servings >= 1) else 1 -%}',
     '{{ {"kind": "plan", "aggregate": agg, "days": days, "people": people, "missingRecipes": (plan.missing_recipes | map(attribute="name") | list)} | tojson }}',
     '{%- else -%}',

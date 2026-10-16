@@ -54,7 +54,9 @@ const COMPUTE = `
 {%- set totals = agg.totals -%}
 {%- set vitamins = totals.vitamins if totals.vitamins is defined else {} -%}
 {%- if is_plan -%}
-{%- set days = (plan.days | length) if (plan.days | length) > 0 else 1 -%}
+{#- Count only day sections: a date or "day" in the header (Day 1, Monday). Snacks, Batch Prep etc. still count toward the totals. Falls back to every section when none look like days. -#}
+{%- set dns = namespace(n=0) -%}{%- for d in plan.days -%}{%- if (d.date is defined and d.date) or (d.name is defined and d.name and "day" in (d.name | lower)) -%}{%- set dns.n = dns.n + 1 -%}{%- endif -%}{%- endfor -%}
+{%- set days = dns.n if dns.n > 0 else ((plan.days | length) if (plan.days | length) > 0 else 1) -%}
 {%- set people = plan.servings if (plan.servings is defined and plan.servings is not none and plan.servings is number and plan.servings >= 1) else 1 -%}
 {%- set day_factor = days -%}
 {%- else -%}
@@ -222,10 +224,13 @@ const HTML_OUTPUT = `
 {%- if is_plan and days >= 2 %}
 {%- set dayrows = namespace(list=[], max=ns.energy_daily) %}
 {%- for day in plan.days %}
+{%- set d = day %}
+{%- if dns.n == 0 or (d.date is defined and d.date) or (d.name is defined and d.name and "day" in (d.name | lower)) %}
 {%- set m = macros(day.ingredients) %}
 {%- set kcal = m.kcal / people %}
 {%- if kcal > dayrows.max %}{% set dayrows.max = kcal %}{% endif %}
 {%- set dayrows.list = dayrows.list + [{"label": (day.date if (day.date is defined and day.date) else (day.name if (day.name is defined and day.name) else ("Day " ~ loop.index))), "kcal": kcal, "protein_g": m.protein_g / people, "carb_g": m.carb_g / people, "fat_g": m.fat_g / people}] %}
+{%- endif %}
 {%- endfor %}
 {%- set chart_w = 40 + (dayrows.list | length) * 72 %}
 {%- set scale = (140 / dayrows.max) if dayrows.max > 0 else 0 %}

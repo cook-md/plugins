@@ -24,6 +24,11 @@ describe('MACROS_TEMPLATE', () => {
 });
 
 describe('parseMacrosOutput', () => {
+    it('counts only day sections of a plan, so Snacks or Batch Prep are not extra days', () => {
+        assert.ok(MACROS_TEMPLATE.includes('"day" in (d.name | lower)'));
+        assert.ok(!MACROS_TEMPLATE.includes('{%- set days = (plan.days | length) if'));
+    });
+
     it('reads a recipe payload and keeps only the fields it needs', () => {
         const data = parseMacrosOutput(JSON.stringify({ kind: 'recipe', aggregate }));
         assert.strictEqual(data?.kind, 'recipe');
