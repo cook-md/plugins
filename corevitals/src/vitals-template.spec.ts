@@ -24,6 +24,15 @@ describe('buildTemplate', () => {
         assert.ok(template.includes('| tojson'));
     });
 
+    it('counts only day sections of a plan, so Snacks or Batch Prep are not extra days', () => {
+        for (const mode of ['json', 'html'] as const) {
+            const template = buildTemplate(buildCheckSpec(SETTINGS, 1), mode);
+            assert.ok(template.includes('"day" in (d.name | lower)'), mode);
+            assert.ok(!template.includes('{%- set days = (plan.days | length) if'), mode);
+        }
+        assert.ok(buildTemplate(buildCheckSpec(SETTINGS, 1), 'html').includes('{%- if dns.n == 0 or'));
+    });
+
     it('tells the report whether servings were known', () => {
         const template = buildTemplate(buildCheckSpec(SETTINGS, 1, false), 'html');
         assert.ok(template.includes('"servingsKnown": false'));
