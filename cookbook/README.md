@@ -4,6 +4,8 @@ Turn a folder of Cooklang recipes into a printable PDF cookbook, right from
 [Cook Editor](https://cook.md/editor): a cover, a table of contents with page numbers, a
 chapter per subfolder, recipe photos and an index of ingredients.
 
+![Pages from an exported cookbook: contents with page numbers, two recipe pages with photos, and the ingredient index](https://raw.githubusercontent.com/cook-md/plugins/main/cookbook/media/screenshots/cookbook-pages.png)
+
 Right-click a folder in the Explorer and choose **Export as Cookbook (PDF)…**, or
 run **Cookbook: Export as Cookbook (PDF)…** from the command palette and pick a
 folder. Cook Editor asks where to save the PDF.

@@ -4,6 +4,8 @@ Aisle-grouped shopping lists from [Cooklang](https://cooklang.org) recipes and
 menus. Ships with Cook Editor; also a reference for plugins that use the
 Cooklang API and outlets.
 
+![Shopping List panel with three recipes and their ingredients grouped by aisle, two items ticked off](https://raw.githubusercontent.com/cook-md/plugins/main/shopping-list/media/screenshots/shopping-list.png)
+
 - Add a recipe or a whole `.menu` from the preview's cart button, the explorer
   context menu, or the editor title bar. Sub-recipe references are included.
 - The cart is hidden on Recipe Hub previews: remote recipes are not in your

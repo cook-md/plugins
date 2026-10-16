@@ -4,6 +4,8 @@ See and edit what's in your [Cooklang](https://cooklang.org) pantry from Cook
 Editor's right sidebar. Install it from the Extensions view (needs a Cook
 Editor with the pantry API; older versions ask you to update).
 
+![Pantry panel: fridge items with low, out-of-stock, expiring and expired status, search and filter chips](https://raw.githubusercontent.com/cook-md/plugins/main/pantry/media/screenshots/pantry.png)
+
 - Items are grouped by the sections of `config/pantry.conf`, the same file
   CookCLI and the shopping list use; pantry items are subtracted from
   shopping lists.

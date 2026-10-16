@@ -2,11 +2,15 @@
 
 Checks a meal plan or a recipe against daily nutrient targets in Cook Editor.
 
+![Vitals 6/17 badge on a recipe preview with its hover listing nutrients below target](https://raw.githubusercontent.com/cook-md/plugins/main/corevitals/media/screenshots/badge.png)
+
 ## What you see
 
 A `Vitals 14/17` pill in the preview header: how many targets the plan meets for the days and people it covers (a recipe is judged per serving against one meal). Green from 90 % of targets met, amber from 60 %, red below. Hover it for what is below target or over a limit.
 
 The heartbeat icon next to the shopping-list cart opens the full report: targets met, energy, the macro split against the recommended ranges, every nutrient as a % of its daily value, energy per day for multi-day plans, and what could not be checked.
+
+![Core Vitals report for a three-day meal plan: targets met, energy, macro split and every nutrient as a share of its daily value](https://raw.githubusercontent.com/cook-md/plugins/main/corevitals/media/screenshots/report.png)
 
 `Vitals ?` means the data does not support a verdict: fewer than 70 % of the ingredients matched the nutrition database, a referenced recipe was not found, or nothing could be evaluated. The hover says which.
 

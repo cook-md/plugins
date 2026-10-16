@@ -2,6 +2,8 @@
 
 Protein, carbs and fat at a glance in Cook Editor: per serving on recipe previews, per person per day on meal plans.
 
+![Macros pill on a recipe preview with its hover showing protein, carbs and fat per serving](https://raw.githubusercontent.com/cook-md/plugins/main/macros/media/screenshots/macros.png)
+
 ## What you see
 
 A pill in the preview header: `38P 52C 14F · 520 kcal` means 38 g protein, 52 g carbohydrate and 14 g fat per serving, 520 kcal. Grams are rounded to whole numbers, energy to the nearest 10 kcal. Pills are short, so the energy is dropped from the pill when it does not fit; the hover always shows it.

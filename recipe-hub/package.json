@@ -2,8 +2,9 @@
   "name": "recipe-hub",
   "displayName": "Recipe Hub",
   "description": "Search the public Cooklang recipe index (recipes.cooklang.org), preview any recipe, and save it to your Drafts.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cooklang",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -2,6 +2,8 @@
 
 Flags the allergens you care about on Cook Editor's recipe preview.
 
+![Allergens badge on a recipe preview with its hover listing eggs and fish](https://raw.githubusercontent.com/cook-md/plugins/main/allergens/media/screenshots/allergens.png)
+
 ## Setup
 
 Open **Settings → Extensions → Allergens** and:

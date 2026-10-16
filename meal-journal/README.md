@@ -4,6 +4,8 @@ A daily meal journal for [Cook Editor](https://cook.md). One file per day
 (`Journal/2026-06-09.journal`), written in [Cooklang](https://cooklang.org/)
 markup — sections for meals, recipe references, ingredients.
 
+![Today's journal entry with meal sections and recipe references, and the Insert Recipe Reference picker open](https://raw.githubusercontent.com/cook-md/plugins/main/meal-journal/media/screenshots/journal.png)
+
 ## Features
 
 | Feature | How |

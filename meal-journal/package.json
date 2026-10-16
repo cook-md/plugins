@@ -2,8 +2,9 @@
   "name": "meal-journal",
   "displayName": "Meal Journal",
   "description": "Daily meal journal using Cooklang markup. Reference example for Cook Editor plugin developers.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cooklang",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",

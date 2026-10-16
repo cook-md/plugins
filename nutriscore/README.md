@@ -5,6 +5,8 @@ badge to see how reliable the score is: how many ingredients were matched,
 which were estimated, the data sources and the estimated fruit/vegetable
 share.
 
+![Nutri-Score A badge on a recipe preview with its hover showing matched ingredients and data sources](https://raw.githubusercontent.com/cook-md/plugins/main/nutriscore/media/screenshots/nutriscore.png)
+
 Requires signing in to cook.md with a Basic or Pro plan (nutrition data comes
 from the cook.md nutrition service). Without it, a greyed "locked" badge is
 shown instead, with a hover card pointing at the plans that unlock it. Turn

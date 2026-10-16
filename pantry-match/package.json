@@ -2,8 +2,9 @@
   "name": "pantry-match",
   "displayName": "Pantry Match",
   "description": "What can I cook? Ranks your recipes by what's already in your pantry and suggests recipes for pantry items that expire soon. Free, works signed out.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "cooklang",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",
