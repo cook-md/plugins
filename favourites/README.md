@@ -2,6 +2,8 @@
 
 Mark recipes as favourites in Cook Editor. Ships with Cook Editor.
 
+![Favourites section in the Explorer next to a recipe preview with a filled heart](https://raw.githubusercontent.com/cook-md/plugins/main/favourites/media/screenshots/favourites.png)
+
 ## What you see
 
 - A heart as the first button in a recipe preview's header: outline when the

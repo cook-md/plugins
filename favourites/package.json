@@ -2,8 +2,9 @@
   "name": "favourites",
   "displayName": "Favourites",
   "description": "Heart on recipe previews and a Favourites view, stored in a plain-text .bookmarks file. Ships with Cook Editor.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "cooklang",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",

@@ -2,8 +2,9 @@
   "name": "shopping-list",
   "displayName": "Shopping List",
   "description": "Aisle-grouped shopping lists from Cooklang recipes and menus, with pantry subtraction. Ships with Cook Editor.",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "publisher": "cooklang",
+  "icon": "media/icon.png",
   "license": "MIT",
   "repository": {
     "type": "git",

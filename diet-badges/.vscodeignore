@@ -7,3 +7,4 @@ out/**/*.spec.js
 out/**/*.map
 **/.DS_Store
 test-fixtures/**
+media/screenshots/**

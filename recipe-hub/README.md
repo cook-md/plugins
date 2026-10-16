@@ -5,6 +5,8 @@ Search the public Cooklang recipe index at
 Editor, preview any result, and save it into your own recipes. Install it from
 the Extensions view in Cook Editor; it opens in the left sidebar.
 
+![Recipe Hub search results in the sidebar and a recipe from the index open in the preview](https://raw.githubusercontent.com/cook-md/plugins/main/recipe-hub/media/screenshots/recipe-hub.png)
+
 - The search box takes the full Recipe Hub query syntax: plain text
   (`pasta`), field queries (`tags:vegan`, `ingredients:garlic`, `title:soup`),
   ranges (`total_time:[0 TO 30]`), quoted phrases (`"olive oil"`) and

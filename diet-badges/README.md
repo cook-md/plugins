@@ -2,6 +2,8 @@
 
 Shows which diets a recipe or meal plan fits on Cook Editor's recipe and menu previews: **Vegan**, **Vegetarian**, **Pescatarian** and **Dairy-free**.
 
+![Pescatarian badge on a recipe preview with its hover explaining which diets fit and why](https://raw.githubusercontent.com/cook-md/plugins/main/diet-badges/media/screenshots/diet-badges.png)
+
 ## What you see
 
 | Badge | Meaning |

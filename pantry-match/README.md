@@ -5,6 +5,8 @@ your folder by how much of each is already in your pantry, and suggests
 recipes for the things that expire soon. Free, and works signed out.
 Install it from the Extensions view.
 
+![What can I cook view in the Explorer, grouped by missing ingredients and by pantry items to use up, next to the Pantry panel](https://raw.githubusercontent.com/cook-md/plugins/main/pantry-match/media/screenshots/what-can-i-cook.png)
+
 ## What you see
 
 A **What can I cook** view in the Explorer:
