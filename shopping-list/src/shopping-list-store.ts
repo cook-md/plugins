@@ -1,6 +1,15 @@
 import {
-    CheckEntry, CooklangApi, ResolvedRecipeReference, ShoppingListEntry, ShoppingListFile, ShoppingListRecipeItem, ShoppingListResult,
+    CheckEntry, CooklangApi, ResolvedRecipeReference, ShoppingListEntry, ShoppingListFile, ShoppingListIngredientItem, ShoppingListRecipeItem,
+    ShoppingListResult,
 } from './cooklang-api';
+import { cleanName, cleanQuantity, FreeHandLine, placeFreeHand } from './free-hand';
+
+/** A top-level free-hand line as a caller last saw it. */
+export interface FreeHandRef {
+    index: number;
+    name: string;
+    quantity?: string;
+}
 
 export const LIST_FILE = '.shopping-list';
 export const CHECKED_FILE = '.shopping-checked';
@@ -96,6 +105,29 @@ export class ShoppingListStore {
         return this.enqueue(() => this.doClearAll());
     }
 
+    /**
+     * Adds free-hand lines at the top level, folding each into a same-name
+     * line when the amounts add up (see `placeFreeHand`). Unticks the names,
+     * since there is more to buy. Returns the names as listed.
+     */
+    addFreeHand(lines: readonly FreeHandLine[]): Promise<string[]> {
+        return this.enqueue(() => this.doAddFreeHand(lines));
+    }
+
+    /** Replaces one top-level free-hand line in place. */
+    editFreeHand(ref: FreeHandRef, line: FreeHandLine): Promise<void> {
+        return this.enqueue(() => this.doEditFreeHand(ref, line));
+    }
+
+    removeFreeHand(ref: FreeHandRef): Promise<void> {
+        return this.enqueue(() => this.doRemoveFreeHand(ref));
+    }
+
+    /** Removes every top-level free-hand line; recipes stay. */
+    removeAllFreeHand(): Promise<void> {
+        return this.enqueue(() => this.doRemoveAllFreeHand());
+    }
+
     checkItem(name: string): Promise<void> {
         return this.enqueue(() => this.appendCheckEntry({ type: 'checked', name }));
     }
@@ -183,6 +215,90 @@ export class ShoppingListStore {
         await this.regenerate();
     }
 
+    protected async doAddFreeHand(lines: readonly FreeHandLine[]): Promise<string[]> {
+        this.assertListWritable();
+        const added: string[] = [];
+        for (const raw of lines) {
+            const line = cleanLine(raw);
+            if (!line) {
+                continue;
+            }
+            const place = placeFreeHand(this.list.items, line);
+            if (place) {
+                const existing = this.list.items[place.index] as ShoppingListIngredientItem;
+                if (place.quantity !== undefined) {
+                    existing.quantity = place.quantity;
+                }
+                added.push(existing.name);
+            } else {
+                this.list.items.push(toIngredientItem(line));
+                added.push(line.name);
+            }
+        }
+        if (added.length === 0) {
+            return added;
+        }
+        await this.save();
+        for (const name of new Set(added.map(name => name.toLowerCase()))) {
+            if (this.checkedSet.has(name)) {
+                await this.appendCheckEntry({ type: 'unchecked', name });
+            }
+        }
+        await this.regenerate();
+        return added;
+    }
+
+    protected async doEditFreeHand(ref: FreeHandRef, raw: FreeHandLine): Promise<void> {
+        this.assertListWritable();
+        const index = this.findFreeHand(ref);
+        const line = cleanLine(raw);
+        if (index === undefined || !line) {
+            return;
+        }
+        this.list.items[index] = toIngredientItem(line);
+        await this.save();
+        await this.regenerate();
+        await this.compactCheckedLog();
+    }
+
+    protected async doRemoveFreeHand(ref: FreeHandRef): Promise<void> {
+        this.assertListWritable();
+        const index = this.findFreeHand(ref);
+        if (index === undefined) {
+            return;
+        }
+        this.list.items.splice(index, 1);
+        await this.save();
+        await this.regenerate();
+        await this.compactCheckedLog();
+    }
+
+    protected async doRemoveAllFreeHand(): Promise<void> {
+        this.assertListWritable();
+        const kept = this.list.items.filter(item => item.type !== 'ingredient');
+        if (kept.length === this.list.items.length) {
+            return;
+        }
+        this.list.items = kept;
+        await this.save();
+        await this.regenerate();
+        await this.compactCheckedLog();
+    }
+
+    /**
+     * The index of the line `ref` names: `ref.index` when it still holds that
+     * line, else the first top-level line with the same name and quantity.
+     */
+    protected findFreeHand(ref: FreeHandRef): number | undefined {
+        const matches = (item: ShoppingListEntry | undefined): boolean =>
+            item?.type === 'ingredient' && item.name === ref.name && item.quantity === ref.quantity;
+        if (matches(this.list.items[ref.index])) {
+            return ref.index;
+        }
+        const index = this.list.items.findIndex(matches);
+        return index < 0 ? undefined : index;
+    }
+
     protected async doClearAll(): Promise<void> {
         // Invalidate any in-flight regenerate() so it cannot resurrect the result.
         ++this.regenerationSeq;
@@ -204,7 +320,8 @@ export class ShoppingListStore {
             return;
         }
         const recipes = this.flattenForGeneration();
-        if (recipes.length === 0) {
+        const freeHand = this.freeHandForGeneration();
+        if (recipes.length === 0 && freeHand.length === 0) {
             this.result = undefined;
             this.error = undefined;
             this.fire();
@@ -213,7 +330,7 @@ export class ShoppingListStore {
         let result: ShoppingListResult | undefined;
         let error: string | undefined;
         try {
-            result = await this.api.generateShoppingList(recipes);
+            result = await this.api.generateShoppingList(recipes, freeHand);
         } catch (e) {
             error = e instanceof Error ? e.message : String(e);
             console.error('[shopping-list] Failed to generate shopping list:', e);
@@ -266,6 +383,18 @@ export class ShoppingListStore {
         };
         this.list.items.forEach(item => walk(item, 1));
         return out;
+    }
+
+    /**
+     * Top-level free-hand lines, as CookCLI aggregates them. Lines nested
+     * under a recipe belong to that recipe's entry and are left out, like in
+     * CookCLI; `? ` selection lines pick a recipe's optional ingredients,
+     * which the editor already lists.
+     */
+    protected freeHandForGeneration(): Array<{ name: string; quantity?: string }> {
+        return this.list.items.flatMap(item => item.type === 'ingredient'
+            ? [item.quantity === undefined ? { name: item.name } : { name: item.name, quantity: item.quantity }]
+            : []);
     }
 
     protected enqueue<T>(work: () => Promise<T>): Promise<T> {
@@ -327,6 +456,20 @@ function toRecipeItem(reference: ResolvedRecipeReference): ShoppingListRecipeIte
         multiplier: reference.scale === 1 ? undefined : reference.scale,
         children: (reference.children ?? []).map(toRecipeItem),
     };
+}
+
+/** `line` cleaned so it reads back unchanged, or undefined when no name is left. */
+function cleanLine(line: FreeHandLine): FreeHandLine | undefined {
+    const name = cleanName(line.name);
+    if (name === '') {
+        return undefined;
+    }
+    const quantity = cleanQuantity(line.quantity);
+    return quantity === undefined ? { name } : { name, quantity };
+}
+
+function toIngredientItem(line: FreeHandLine): ShoppingListIngredientItem {
+    return line.quantity === undefined ? { type: 'ingredient', name: line.name } : { type: 'ingredient', name: line.name, quantity: line.quantity };
 }
 
 /** Names of free-hand lines, top-level and nested. */

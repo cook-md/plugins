@@ -76,8 +76,16 @@ export class CooklangApi {
         return this.call('cooklang.api.version');
     }
 
-    generateShoppingList(recipes: ReadonlyArray<{ path: string; scale: number }>): Promise<ShoppingListResult> {
-        return this.call('cooklang.api.generateShoppingList', { recipes });
+    /**
+     * `ingredients` are free-hand lines, merged in unscaled. Editors without
+     * free-hand aggregation ignore them; the view still lists them under
+     * "Other items".
+     */
+    generateShoppingList(
+        recipes: ReadonlyArray<{ path: string; scale: number }>,
+        ingredients: ReadonlyArray<{ name: string; quantity?: string }> = [],
+    ): Promise<ShoppingListResult> {
+        return this.call('cooklang.api.generateShoppingList', ingredients.length > 0 ? { recipes, ingredients } : { recipes });
     }
 
     resolveRecipeReferences(path: string): Promise<ResolvedRecipeReference[]> {

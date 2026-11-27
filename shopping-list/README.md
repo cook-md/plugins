@@ -11,6 +11,10 @@ Cooklang API and outlets.
 - The cart is hidden on Recipe Hub previews: remote recipes are not in your
   folder, so save one to Drafts first.
 - Change each entry's scale, remove entries, check items off.
+- Type your own items in the box at the top (`Milk 2 l`, `Sugar 1.5kg`,
+  `3 lemons`), or paste a list to add several at once. They are merged with
+  the recipes' ingredients and can be edited or removed under "Other Items".
+  The same lines written by CookCLI or the mobile apps show up here too.
 - Items are grouped by `config/aisle.conf`; anything in `config/pantry.conf`
   is subtracted.
 - The list lives in `.shopping-list` and `.shopping-checked` at the root of

@@ -6,7 +6,97 @@ body {
     line-height: 1.6;
 }
 
-#root { padding: 12px 16px; }
+#root { padding: 4px 16px 12px; }
+
+/* ── Composer (quick add) ── */
+#composer {
+    position: sticky;
+    top: 0;
+    z-index: 1;
+    padding: 12px 16px 8px;
+    /* Opaque so the list scrolls under it; the same colour as the page. */
+    background-color: inherit;
+}
+
+#composer[hidden], .paste-preview[hidden], .quantity-chip[hidden] { display: none; }
+
+.composer-form {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 2px 2px 8px;
+    background: var(--vscode-input-background);
+    border: 1px solid var(--vscode-input-border, var(--vscode-panel-border));
+    border-radius: 4px;
+}
+
+.composer-form:focus-within { border-color: var(--vscode-focusBorder); }
+
+.composer-input, .edit-input {
+    flex: 1;
+    min-width: 0;
+    padding: 3px 0;
+    background: transparent;
+    color: var(--vscode-input-foreground);
+    border: none;
+    outline: none;
+    font: inherit;
+}
+
+/* The wrapper (or the edit box border) shows focus; no second outline inside it. */
+.composer-input:focus, .edit-input:focus { outline: none; }
+
+.composer-input::placeholder { color: var(--vscode-input-placeholderForeground); }
+
+.quantity-chip {
+    flex: none;
+    padding: 0 6px;
+    border-radius: 3px;
+    font-size: 0.85em;
+    white-space: nowrap;
+    color: var(--vscode-badge-foreground);
+    background: var(--vscode-badge-background);
+}
+
+.composer-add, .paste-actions .primary {
+    padding: 2px 10px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font: inherit;
+    color: var(--vscode-button-foreground);
+    background: var(--vscode-button-background);
+}
+
+.composer-add:hover:not(:disabled), .paste-actions .primary:hover { background: var(--vscode-button-hoverBackground); }
+.composer-add:disabled { opacity: 0.5; cursor: default; }
+
+.paste-preview {
+    margin-top: 8px;
+    padding: 6px 8px;
+    border: 1px solid var(--vscode-panel-border);
+    border-radius: 4px;
+    background: var(--vscode-editorWidget-background, var(--vscode-input-background));
+}
+
+.paste-list { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; }
+.paste-row { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.paste-row .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.paste-actions { display: flex; gap: 6px; margin-top: 6px; }
+
+.paste-actions .secondary {
+    padding: 2px 10px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+    font: inherit;
+    color: var(--vscode-button-secondaryForeground);
+    background: var(--vscode-button-secondaryBackground);
+}
+
+.paste-actions .secondary:hover { background: var(--vscode-button-secondaryHoverBackground); }
+
+.toolbar { display: flex; justify-content: flex-end; margin-bottom: 4px; }
 
 .empty {
     padding: 16px;
@@ -31,7 +121,7 @@ body {
     border-bottom: 1px solid var(--vscode-panel-border);
 }
 
-.recipes-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.section-header { display: flex; align-items: center; justify-content: space-between; }
 
 .clear {
     background: none;
@@ -69,7 +159,7 @@ body {
     border-radius: 3px;
 }
 
-.remove {
+.icon-button {
     background: none;
     border: none;
     color: var(--vscode-descriptionForeground);
@@ -79,7 +169,46 @@ body {
     line-height: 1;
 }
 
-.remove:hover { color: var(--vscode-errorForeground); }
+.icon-button:hover { color: var(--vscode-foreground); }
+.icon-button.remove:hover, .icon-button.paste-drop:hover { color: var(--vscode-errorForeground); }
+.icon-button.remove-all { font-size: 0.85em; }
+.icon-button:focus-visible, .clear:focus-visible { outline: 1px solid var(--vscode-focusBorder); outline-offset: 1px; }
+
+/* ── Other items (free-hand lines) ── */
+.free-hand {
+    margin-bottom: 16px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.free-hand-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    min-height: 24px;
+    padding: 1px 0;
+    border-bottom: 1px solid var(--vscode-panel-border);
+}
+
+.free-hand-row:last-child { border-bottom: none; }
+.free-hand-row .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; }
+.free-hand-row .icon-button.edit { visibility: hidden; }
+.free-hand-row:hover .icon-button.edit, .free-hand-row:focus-within .icon-button.edit { visibility: visible; }
+
+.edit-input {
+    padding: 2px 6px;
+    border: 1px solid var(--vscode-focusBorder);
+    border-radius: 3px;
+    background: var(--vscode-input-background);
+}
+
+/* Rows just added: a short highlight, as in the iOS app. */
+.just-added { animation: just-added 2s ease-out; }
+
+@keyframes just-added {
+    from { background: var(--vscode-editor-findMatchHighlightBackground, var(--vscode-list-hoverBackground)); }
+    to { background: transparent; }
+}
 
 .category { margin-bottom: 12px; }
 .category .section-title { padding: 4px 0; border-bottom: 1px solid var(--vscode-panel-border); }

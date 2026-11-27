@@ -3,10 +3,14 @@ import * as vscode from 'vscode';
 import { CooklangApi } from './cooklang-api';
 import { isMenuPath, parseAddRecipesRequest, RecipeTarget, resolveTargets, TargetResolver } from './command-args';
 import { ResolvedRecipeReference } from './cooklang-api';
-import { FromWebview, ToWebview, ViewState } from './protocol';
+import { recognizeLine } from './free-hand';
+import { FreeHandRef, FromWebview, ToWebview, ViewState } from './protocol';
 import { ListFiles, ShoppingListStore } from './shopping-list-store';
 
 const VIEW_ID = 'shoppingList.view';
+/** Bounds on what the webview may send in one message. */
+const MAX_LINE_LENGTH = 500;
+const MAX_PASTED_LINES = 200;
 
 /** `workspace.fs` at one root, by file name. */
 class WorkspaceListFiles implements ListFiles {
@@ -49,14 +53,24 @@ function isValidMessage(message: unknown): message is FromWebview {
     if (typeof message !== 'object' || message === null) {
         return false;
     }
-    const m = message as { type?: unknown; index?: unknown; scale?: unknown; name?: unknown };
+    const m = message as { type?: unknown; index?: unknown; scale?: unknown; name?: unknown; lines?: unknown; line?: unknown; item?: unknown };
     const isIndex = (value: unknown): boolean => Number.isInteger(value) && (value as number) >= 0;
+    const isLine = (value: unknown): boolean => typeof value === 'string' && value.length <= MAX_LINE_LENGTH;
+    const isRef = (value: unknown): value is FreeHandRef => {
+        const ref = value as Partial<FreeHandRef> | null;
+        return typeof ref === 'object' && ref !== null && isIndex(ref.index) && typeof ref.name === 'string'
+            && (ref.quantity === undefined || typeof ref.quantity === 'string');
+    };
     switch (m.type) {
         case 'ready':
         case 'clear': return true;
         case 'remove': return isIndex(m.index);
         case 'scale': return isIndex(m.index) && typeof m.scale === 'number' && Number.isFinite(m.scale) && m.scale > 0;
         case 'toggle': return typeof m.name === 'string' && m.name.trim() !== '';
+        case 'addItems': return Array.isArray(m.lines) && m.lines.length <= MAX_PASTED_LINES && m.lines.every(isLine);
+        case 'editItem': return isRef(m.item) && isLine(m.line);
+        case 'removeItem': return isRef(m.item);
+        case 'removeAllItems': return true;
         default: return false;
     }
 }
@@ -100,7 +114,7 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src ${view.webview.cspSource}; script-src 'nonce-${nonce}';">
 <link rel="stylesheet" href="${css}">
 </head>
-<body><div id="root"></div><script nonce="${nonce}" src="${script}"></script></body>
+<body><div id="composer"></div><div id="root"></div><script nonce="${nonce}" src="${script}"></script></body>
 </html>`;
         view.webview.onDidReceiveMessage((message: unknown) => this.onMessage(message));
         view.onDidDispose(() => { this.view = undefined; });
@@ -255,8 +269,26 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
                 case 'scale': return store.updateScale(message.index, message.scale);
                 case 'clear': return store.clearAll();
                 case 'toggle': return store.toggleItem(message.name);
+                case 'addItems': return this.addItems(store, message.lines);
+                case 'editItem': return this.editItem(store, message.item, message.line);
+                case 'removeItem': return store.removeFreeHand(message.item);
+                case 'removeAllItems': return store.removeAllFreeHand();
             }
         });
+    }
+
+    protected async addItems(store: ShoppingListStore, lines: readonly string[]): Promise<void> {
+        const added = await store.addFreeHand(lines.flatMap(line => recognizeLine(line) ?? []));
+        if (added.length > 0 && this.view) {
+            const message: ToWebview = { type: 'added', names: added };
+            this.view.webview.postMessage(message);
+        }
+    }
+
+    /** An edit that leaves no name is a delete. */
+    protected async editItem(store: ShoppingListStore, item: FreeHandRef, text: string): Promise<void> {
+        const line = recognizeLine(text);
+        await (line ? store.editFreeHand(item, line) : store.removeFreeHand(item));
     }
 
     protected postState(): void {
