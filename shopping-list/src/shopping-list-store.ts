@@ -1,4 +1,6 @@
-import { CheckEntry, CooklangApi, ResolvedRecipeReference, ShoppingListFile, ShoppingListRecipeItem, ShoppingListResult } from './cooklang-api';
+import {
+    CheckEntry, CooklangApi, ResolvedRecipeReference, ShoppingListEntry, ShoppingListFile, ShoppingListRecipeItem, ShoppingListResult,
+} from './cooklang-api';
 
 export const LIST_FILE = '.shopping-list';
 export const CHECKED_FILE = '.shopping-checked';
@@ -47,7 +49,8 @@ export class ShoppingListStore {
         return { dispose: () => this.listeners.delete(listener) };
     }
 
-    getItems(): readonly ShoppingListRecipeItem[] {
+    /** Every top-level entry, free-hand lines included; recipe row indices point into this. */
+    getItems(): readonly ShoppingListEntry[] {
         return this.list.items;
     }
 
@@ -160,7 +163,7 @@ export class ShoppingListStore {
 
     protected async doRemoveRecipe(index: number): Promise<void> {
         this.assertListWritable();
-        if (index < 0 || index >= this.list.items.length) {
+        if (this.list.items[index]?.type !== 'recipe') {
             return;
         }
         this.list.items.splice(index, 1);
@@ -171,10 +174,11 @@ export class ShoppingListStore {
 
     protected async doUpdateScale(index: number, scale: number): Promise<void> {
         this.assertListWritable();
-        if (index < 0 || index >= this.list.items.length) {
+        const item = this.list.items[index];
+        if (item?.type !== 'recipe') {
             return;
         }
-        this.list.items[index].multiplier = scale === 1 ? undefined : scale;
+        item.multiplier = scale === 1 ? undefined : scale;
         await this.save();
         await this.regenerate();
     }
@@ -199,7 +203,8 @@ export class ShoppingListStore {
             // Keep the "could not read" error visible until the file is fixed or cleared.
             return;
         }
-        if (this.list.items.length === 0) {
+        const recipes = this.flattenForGeneration();
+        if (recipes.length === 0) {
             this.result = undefined;
             this.error = undefined;
             this.fire();
@@ -208,7 +213,7 @@ export class ShoppingListStore {
         let result: ShoppingListResult | undefined;
         let error: string | undefined;
         try {
-            result = await this.api.generateShoppingList(this.flattenForGeneration());
+            result = await this.api.generateShoppingList(recipes);
         } catch (e) {
             error = e instanceof Error ? e.message : String(e);
             console.error('[shopping-list] Failed to generate shopping list:', e);
@@ -247,10 +252,14 @@ export class ShoppingListStore {
     /**
      * `{ path, scale }` for every node: a parent contributes its own
      * ingredients and each child is scaled by its parent's multiplier.
+     * Free-hand lines are not recipes and are skipped.
      */
     protected flattenForGeneration(): Array<{ path: string; scale: number }> {
         const out: Array<{ path: string; scale: number }> = [];
-        const walk = (item: ShoppingListRecipeItem, parentScale: number): void => {
+        const walk = (item: ShoppingListEntry, parentScale: number): void => {
+            if (item.type !== 'recipe') {
+                return;
+            }
             const scale = (item.multiplier ?? 1) * parentScale;
             out.push({ path: item.path, scale });
             item.children.forEach(child => walk(child, scale));
@@ -285,7 +294,7 @@ export class ShoppingListStore {
         this.fire();
     }
 
-    /** Keep only log entries whose ingredient is still in the result (cookcli policy). */
+    /** Keep only log entries whose ingredient is still in the result or on a free-hand line (cookcli policy). */
     protected async compactCheckedLog(): Promise<void> {
         if (!this.result) {
             return;
@@ -293,6 +302,7 @@ export class ShoppingListStore {
         const names = [
             ...this.result.categories.flatMap(category => category.items.map(item => item.name)),
             ...this.result.other.items.map(item => item.name),
+            ...freeHandNames(this.list.items),
         ];
         const compacted = await this.api.compactShoppingChecked(this.checkedLog, names);
         if (compacted.length === 0) {
@@ -317,6 +327,11 @@ function toRecipeItem(reference: ResolvedRecipeReference): ShoppingListRecipeIte
         multiplier: reference.scale === 1 ? undefined : reference.scale,
         children: (reference.children ?? []).map(toRecipeItem),
     };
+}
+
+/** Names of free-hand lines, top-level and nested. */
+function freeHandNames(items: readonly ShoppingListEntry[]): string[] {
+    return items.flatMap(item => item.type === 'ingredient' ? [item.name] : freeHandNames(item.children));
 }
 
 /** Last write wins; names compare lower-cased, as in cooklang-rs. */

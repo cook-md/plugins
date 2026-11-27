@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { CheckEntry, CooklangApi, ShoppingListFile, ShoppingListResult } from './cooklang-api';
+import { CheckEntry, CooklangApi, ShoppingListEntry, ShoppingListFile, ShoppingListRecipeItem, ShoppingListResult } from './cooklang-api';
 import { CHECKED_FILE, LIST_FILE, ListFiles, ShoppingListStore } from './shopping-list-store';
 
 class FakeFiles implements ListFiles {
@@ -26,10 +26,17 @@ class FakeApi extends CooklangApi {
         if (text.trim() === 'GARBAGE') {
             throw new Error('unexpected token');
         }
+        if (text.startsWith('{')) {
+            return JSON.parse(text);
+        }
         return { items: text.split('\n').filter(line => line.trim()).map(line => ({ type: 'recipe', path: line.trim(), children: [] })) };
     }
+    /** One path per line for flat recipe lists; JSON once free-hand lines or nesting are involved. */
     override async writeShoppingList(list: ShoppingListFile): Promise<string> {
-        return list.items.map(item => item.path).join('\n') + (list.items.length > 0 ? '\n' : '');
+        if (list.items.some(item => item.type !== 'recipe' || item.children.length > 0)) {
+            return JSON.stringify(list);
+        }
+        return list.items.map(pathOf).join('\n') + (list.items.length > 0 ? '\n' : '');
     }
     override async parseShoppingChecked(text: string): Promise<CheckEntry[]> {
         const entries: CheckEntry[] = [];
@@ -56,6 +63,18 @@ function makeStore(): { store: ShoppingListStore; files: FakeFiles; api: FakeApi
     return { store, files, api };
 }
 
+/** The recipe at `index`, then at each nested child index. */
+function at(items: readonly ShoppingListEntry[], index: number, ...nested: number[]): ShoppingListRecipeItem {
+    const item = items[index];
+    assert.strictEqual(item?.type, 'recipe');
+    const recipe = item as ShoppingListRecipeItem;
+    return nested.length === 0 ? recipe : at(recipe.children, nested[0], ...nested.slice(1));
+}
+
+function pathOf(item: ShoppingListEntry): string {
+    return item.type === 'recipe' ? item.path : `~${item.name}`;
+}
+
 function sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
@@ -73,7 +92,7 @@ describe('ShoppingListStore', () => {
     it('stores a scale other than 1 as the multiplier', async () => {
         const { store } = makeStore();
         await store.addRecipe('pasta.cook', 2);
-        assert.strictEqual(store.getItems()[0].multiplier, 2);
+        assert.strictEqual(at(store.getItems(), 0).multiplier, 2);
     });
 
     it('addMenu creates a nested structure', async () => {
@@ -81,8 +100,8 @@ describe('ShoppingListStore', () => {
         await store.addMenu('weekday.menu', 1, [{ path: 'pasta.cook', scale: 1 }, { path: 'salad.cook', scale: 2 }]);
         const items = store.getItems();
         assert.strictEqual(items.length, 1);
-        assert.strictEqual(items[0].children.length, 2);
-        assert.strictEqual(items[0].children[1].multiplier, 2);
+        assert.strictEqual(at(items, 0).children.length, 2);
+        assert.strictEqual(at(items, 0, 1).multiplier, 2);
     });
 
     it('addMenu keeps references nested below the menu recipes (cookcli#509)', async () => {
@@ -90,21 +109,21 @@ describe('ShoppingListStore', () => {
         await store.addMenu('week.menu', 1, [
             { path: 'Dinner', scale: 1, children: [{ path: 'Sauce', scale: 0.5, children: [{ path: 'Prep', scale: 2 }] }] },
         ]);
-        const dinner = store.getItems()[0].children[0];
+        const dinner = at(store.getItems(), 0, 0);
         assert.strictEqual(dinner.path, 'Dinner');
-        assert.strictEqual(dinner.children[0].path, 'Sauce');
-        assert.strictEqual(dinner.children[0].multiplier, 0.5);
-        assert.strictEqual(dinner.children[0].children[0].path, 'Prep');
-        assert.strictEqual(dinner.children[0].children[0].multiplier, 2);
+        assert.strictEqual(at(dinner.children, 0).path, 'Sauce');
+        assert.strictEqual(at(dinner.children, 0).multiplier, 0.5);
+        assert.strictEqual(at(dinner.children, 0, 0).path, 'Prep');
+        assert.strictEqual(at(dinner.children, 0, 0).multiplier, 2);
     });
 
     it('addRecipe strips ./ from references at every depth', async () => {
         const { store } = makeStore();
         await store.addRecipe('a.cook', 1, [{ path: './b', scale: 1, children: [{ path: './c', scale: 1, children: [{ path: 'd', scale: 1 }] }] }]);
-        const b = store.getItems()[0].children[0];
+        const b = at(store.getItems(), 0, 0);
         assert.strictEqual(b.path, 'b');
-        assert.strictEqual(b.children[0].path, 'c');
-        assert.strictEqual(b.children[0].children[0].path, 'd');
+        assert.strictEqual(at(b.children, 0).path, 'c');
+        assert.strictEqual(at(b.children, 0, 0).path, 'd');
     });
 
     it('generates from the flattened tree with multipliers applied down', async () => {
@@ -120,12 +139,12 @@ describe('ShoppingListStore', () => {
         await store.addRecipe('a.cook', 1);
         await store.addRecipe('b.cook', 1);
         await store.updateScale(0, 3);
-        assert.strictEqual(store.getItems()[0].multiplier, 3);
+        assert.strictEqual(at(store.getItems(), 0).multiplier, 3);
         await store.updateScale(0, 1);
-        assert.strictEqual(store.getItems()[0].multiplier, undefined);
+        assert.strictEqual(at(store.getItems(), 0).multiplier, undefined);
         await store.removeRecipe(5);
         await store.removeRecipe(0);
-        assert.deepStrictEqual(store.getItems().map(item => item.path), ['b.cook']);
+        assert.deepStrictEqual(store.getItems().map(pathOf), ['b.cook']);
         assert.strictEqual(files.files.get(LIST_FILE), 'b.cook\n');
     });
 
@@ -188,12 +207,68 @@ describe('ShoppingListStore', () => {
         assert.strictEqual(store.getError(), undefined);
     });
 
+    it('keeps free-hand lines, top-level and nested, when recipes are added, scaled and removed', async () => {
+        const { store, files, api } = makeStore();
+        const nested: ShoppingListEntry = { type: 'recipe', path: 'Plans/Week.menu', children: [
+            { type: 'recipe', path: 'Dinner/Soup', children: [] },
+            { type: 'ingredient', name: 'olive oil', quantity: '200%ml' },
+            { type: 'ingredient', name: 'salt', quantity: 'a pinch', optional: true },
+        ] };
+        files.files.set(LIST_FILE, JSON.stringify({ items: [
+            { type: 'recipe', path: 'Dinner/Pasta', multiplier: 2, children: [] },
+            { type: 'ingredient', name: 'milk', quantity: '2%l' },
+            { type: 'ingredient', name: 'bread' },
+            nested,
+        ] }));
+        await store.load();
+        assert.deepStrictEqual(api.generateCalls.at(-1), [
+            { path: 'Dinner/Pasta', scale: 2 }, { path: 'Plans/Week.menu', scale: 1 }, { path: 'Dinner/Soup', scale: 1 },
+        ]);
+
+        await store.addRecipe('Lunch/Salad.cook', 1);
+        await store.updateScale(3, 2);
+        await store.removeRecipe(0);
+        // Indexes of free-hand lines are not recipe rows.
+        await store.removeRecipe(0);
+        await store.updateScale(1, 5);
+
+        const saved = JSON.parse(files.files.get(LIST_FILE) ?? '') as ShoppingListFile;
+        assert.deepStrictEqual(saved.items, [
+            { type: 'ingredient', name: 'milk', quantity: '2%l' },
+            { type: 'ingredient', name: 'bread' },
+            { ...nested, multiplier: 2 },
+            { type: 'recipe', path: 'Lunch/Salad.cook', children: [] },
+        ]);
+    });
+
+    it('does not generate for a list of only free-hand lines', async () => {
+        const { store, files, api } = makeStore();
+        files.files.set(LIST_FILE, JSON.stringify({ items: [{ type: 'ingredient', name: 'milk' }] }));
+        await store.load();
+        assert.deepStrictEqual(api.generateCalls, []);
+        assert.strictEqual(store.getResult(), undefined);
+        assert.strictEqual(store.getError(), undefined);
+    });
+
+    it('keeps the ticks of free-hand items when compacting the checked log', async () => {
+        const { store, files } = makeStore();
+        files.files.set(LIST_FILE, JSON.stringify({ items: [
+            { type: 'recipe', path: 'a.cook', children: [] },
+            { type: 'recipe', path: 'b.cook', children: [{ type: 'ingredient', name: 'Olive Oil' }] },
+            { type: 'ingredient', name: 'milk' },
+        ] }));
+        files.files.set(CHECKED_FILE, '+ flour\n+ milk\n+ olive oil\n+ gone\n');
+        await store.load();
+        await store.removeRecipe(0);
+        assert.strictEqual(files.files.get(CHECKED_FILE), '+ flour\n+ milk\n+ olive oil\n');
+    });
+
     it('load reads both files', async () => {
         const { store, files } = makeStore();
         files.files.set(LIST_FILE, 'pasta.cook\nsoup.cook\n');
         files.files.set(CHECKED_FILE, '+ flour\n');
         await store.load();
-        assert.deepStrictEqual(store.getItems().map(item => item.path), ['pasta.cook', 'soup.cook']);
+        assert.deepStrictEqual(store.getItems().map(pathOf), ['pasta.cook', 'soup.cook']);
         assert.strictEqual(store.isChecked('flour'), true);
     });
 
@@ -251,7 +326,7 @@ describe('ShoppingListStore', () => {
         await store.checkItem('flour');
         store.scheduleReload();
         await sleep(30);
-        assert.deepStrictEqual(store.getItems().map(item => item.path), ['pasta.cook']);
+        assert.deepStrictEqual(store.getItems().map(pathOf), ['pasta.cook']);
         assert.strictEqual(store.isChecked('flour'), true);
     });
 

@@ -1,4 +1,4 @@
-import type { ShoppingListCategory, ShoppingListRecipeItem, ShoppingListResult } from './cooklang-api';
+import type { ShoppingListCategory, ShoppingListEntry, ShoppingListResult } from './cooklang-api';
 
 export interface RecipeRow {
     index: number;
@@ -13,14 +13,21 @@ export function displayNameFromPath(path: string): string {
     return base.replace(/\.(cook|menu)$/i, '');
 }
 
-export function recipeRows(items: readonly ShoppingListRecipeItem[]): RecipeRow[] {
-    return items.map((item, index) => {
-        const row: RecipeRow = { index, name: displayNameFromPath(item.path), scale: item.multiplier ?? 1 };
-        if (item.children.length > 0 && /\.menu$/i.test(item.path)) {
-            row.detail = `menu (${item.children.length} recipes)`;
+/** One row per top-level recipe; `index` points into the full item list, free-hand lines included. */
+export function recipeRows(items: readonly ShoppingListEntry[]): RecipeRow[] {
+    const rows: RecipeRow[] = [];
+    items.forEach((item, index) => {
+        if (item.type !== 'recipe') {
+            return;
         }
-        return row;
+        const row: RecipeRow = { index, name: displayNameFromPath(item.path), scale: item.multiplier ?? 1 };
+        const recipes = item.children.filter(child => child.type === 'recipe').length;
+        if (recipes > 0 && /\.menu$/i.test(item.path)) {
+            row.detail = `menu (${recipes} recipes)`;
+        }
+        rows.push(row);
     });
+    return rows;
 }
 
 /** Aisles in aisle.conf order (empty ones dropped), then uncategorised items sorted by name. */
