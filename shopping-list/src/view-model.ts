@@ -1,4 +1,5 @@
 import type { ShoppingListCategory, ShoppingListEntry, ShoppingListResult } from './cooklang-api';
+import type { FreeHandRef } from './shopping-list-store';
 
 export interface RecipeRow {
     index: number;
@@ -26,6 +27,32 @@ export function recipeRows(items: readonly ShoppingListEntry[]): RecipeRow[] {
             row.detail = `menu (${recipes} recipes)`;
         }
         rows.push(row);
+    });
+    return rows;
+}
+
+export interface FreeHandRow {
+    /** What the extension needs to find the line again. */
+    ref: FreeHandRef;
+    /** `2 l`; empty when the line has no amount. */
+    quantity: string;
+    /** What the edit box starts with: `Milk 2 l`. */
+    editText: string;
+}
+
+/** How a stored quantity reads in the list: `2%l` → `2 l`. */
+export function displayQuantity(quantity: string | undefined): string {
+    return quantity === undefined ? '' : quantity.replace(/%/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+/** One row per top-level free-hand line, in file order. */
+export function freeHandRows(items: readonly ShoppingListEntry[], editText: (ref: FreeHandRef) => string): FreeHandRow[] {
+    const rows: FreeHandRow[] = [];
+    items.forEach((item, index) => {
+        if (item.type === 'ingredient') {
+            const ref: FreeHandRef = item.quantity === undefined ? { index, name: item.name } : { index, name: item.name, quantity: item.quantity };
+            rows.push({ ref, quantity: displayQuantity(item.quantity), editText: editText(ref) });
+        }
     });
     return rows;
 }

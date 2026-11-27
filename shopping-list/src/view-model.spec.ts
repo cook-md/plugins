@@ -1,5 +1,5 @@
 import * as assert from 'assert';
-import { displayCategories, displayNameFromPath, recipeRows } from './view-model';
+import { displayCategories, displayNameFromPath, freeHandRows, recipeRows } from './view-model';
 
 describe('view model', () => {
     it('names entries after the file, without extension or folders', () => {
@@ -39,6 +39,16 @@ describe('view model', () => {
         }), [
             { name: 'produce', items: [{ name: 'garlic', quantities: '3' }] },
             { name: 'other', items: [{ name: 'flour', quantities: '1 kg' }, { name: 'salt', quantities: '' }] },
+        ]);
+    });
+    it('lists top-level free-hand lines with their index and a readable amount', () => {
+        assert.deepStrictEqual(freeHandRows([
+            { type: 'recipe', path: 'Soup.cook', children: [{ type: 'ingredient', name: 'salt' }] },
+            { type: 'ingredient', name: 'milk', quantity: '2%l' },
+            { type: 'ingredient', name: 'bread' },
+        ], ref => `edit ${ref.name}`), [
+            { ref: { index: 1, name: 'milk', quantity: '2%l' }, quantity: '2 l', editText: 'edit milk' },
+            { ref: { index: 2, name: 'bread' }, quantity: '', editText: 'edit bread' },
         ]);
     });
 });

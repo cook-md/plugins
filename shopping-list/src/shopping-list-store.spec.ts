@@ -15,11 +15,16 @@ class FakeApi extends CooklangApi {
         categories: [], other: { name: 'other', items: [{ name: 'flour', quantities: '' }] }, pantryItems: [],
     });
     generateCalls: Array<ReadonlyArray<{ path: string; scale: number }>> = [];
+    generateIngredients: Array<ReadonlyArray<{ name: string; quantity?: string }>> = [];
 
     constructor() { super(async () => undefined); }
 
-    override async generateShoppingList(recipes: ReadonlyArray<{ path: string; scale: number }>): Promise<ShoppingListResult> {
+    override async generateShoppingList(
+        recipes: ReadonlyArray<{ path: string; scale: number }>,
+        ingredients: ReadonlyArray<{ name: string; quantity?: string }> = [],
+    ): Promise<ShoppingListResult> {
         this.generateCalls.push(recipes);
+        this.generateIngredients.push(ingredients);
         return this.generate(recipes);
     }
     override async parseShoppingList(text: string): Promise<ShoppingListFile> {
@@ -224,6 +229,8 @@ describe('ShoppingListStore', () => {
         assert.deepStrictEqual(api.generateCalls.at(-1), [
             { path: 'Dinner/Pasta', scale: 2 }, { path: 'Plans/Week.menu', scale: 1 }, { path: 'Dinner/Soup', scale: 1 },
         ]);
+        // Only top-level lines are aggregated, as in CookCLI.
+        assert.deepStrictEqual(api.generateIngredients.at(-1), [{ name: 'milk', quantity: '2%l' }, { name: 'bread' }]);
 
         await store.addRecipe('Lunch/Salad.cook', 1);
         await store.updateScale(3, 2);
@@ -241,13 +248,91 @@ describe('ShoppingListStore', () => {
         ]);
     });
 
-    it('does not generate for a list of only free-hand lines', async () => {
+    it('generates for a list of only free-hand lines', async () => {
         const { store, files, api } = makeStore();
         files.files.set(LIST_FILE, JSON.stringify({ items: [{ type: 'ingredient', name: 'milk' }] }));
         await store.load();
-        assert.deepStrictEqual(api.generateCalls, []);
-        assert.strictEqual(store.getResult(), undefined);
-        assert.strictEqual(store.getError(), undefined);
+        assert.deepStrictEqual(api.generateCalls, [[]]);
+        assert.deepStrictEqual(api.generateIngredients, [[{ name: 'milk' }]]);
+        assert.notStrictEqual(store.getResult(), undefined);
+    });
+
+    it('adds free-hand lines, folding same-name lines whose amounts add up', async () => {
+        const { store, files } = makeStore();
+        await store.addRecipe('pasta.cook', 1);
+        const added = await store.addFreeHand([
+            { name: 'Milk', quantity: '1%l' }, { name: 'bread' }, { name: 'milk', quantity: '0.5%l' },
+            { name: 'Bread' }, { name: 'milk', quantity: '200%ml' }, { name: '  ' }, { name: 'half-and-half' },
+        ]);
+        assert.deepStrictEqual(added, ['Milk', 'bread', 'Milk', 'bread', 'milk', 'half-and-half']);
+        const saved = JSON.parse(files.files.get(LIST_FILE) ?? '') as ShoppingListFile;
+        assert.deepStrictEqual(saved.items, [
+            { type: 'recipe', path: 'pasta.cook', children: [] },
+            { type: 'ingredient', name: 'Milk', quantity: '1.5%l' },
+            { type: 'ingredient', name: 'bread' },
+            { type: 'ingredient', name: 'milk', quantity: '200%ml' },
+            { type: 'ingredient', name: 'half-and-half' },
+        ]);
+    });
+
+    it('puts the list back when saving a change fails', async () => {
+        const { store, files } = makeStore();
+        await store.addFreeHand([{ name: 'milk', quantity: '1%l' }]);
+        const saved = files.files.get(LIST_FILE);
+        files.write = async () => { throw new Error('Invalid arguments: refused'); };
+        await assert.rejects(store.addFreeHand([{ name: 'bread' }, { name: 'milk', quantity: '1%l' }]), /refused/);
+        await assert.rejects(store.removeAllFreeHand(), /refused/);
+        assert.deepStrictEqual(store.getItems(), [{ type: 'ingredient', name: 'milk', quantity: '1%l' }]);
+        assert.strictEqual(files.files.get(LIST_FILE), saved);
+    });
+
+    it('unticks a name when more of it is added', async () => {
+        const { store, files } = makeStore();
+        await store.addFreeHand([{ name: 'milk' }]);
+        await store.checkItem('Milk');
+        await store.addFreeHand([{ name: 'milk', quantity: '1%l' }]);
+        assert.strictEqual(store.isChecked('milk'), false);
+        assert.strictEqual(files.files.get(CHECKED_FILE), '+ Milk\n- milk\n');
+    });
+
+    it('edits and removes the line the view saw, even after the file moved under it', async () => {
+        const { store, files } = makeStore();
+        files.files.set(LIST_FILE, JSON.stringify({ items: [
+            { type: 'ingredient', name: 'milk', quantity: '2%l' },
+            { type: 'ingredient', name: 'bread' },
+        ] }));
+        await store.load();
+        // Another device inserted a line at the top: index 0 is no longer milk.
+        files.files.set(LIST_FILE, JSON.stringify({ items: [
+            { type: 'ingredient', name: 'eggs' },
+            { type: 'ingredient', name: 'milk', quantity: '2%l' },
+            { type: 'ingredient', name: 'bread' },
+        ] }));
+        await store.load();
+        await store.editFreeHand({ index: 0, name: 'milk', quantity: '2%l' }, { name: 'oat milk', quantity: '1%l' });
+        await store.removeFreeHand({ index: 2, name: 'bread' });
+        // A line that is gone is left alone.
+        await store.removeFreeHand({ index: 0, name: 'butter' });
+        await store.editFreeHand({ index: 0, name: 'eggs' }, { name: ' ' });
+        assert.deepStrictEqual((JSON.parse(files.files.get(LIST_FILE) ?? '') as ShoppingListFile).items, [
+            { type: 'ingredient', name: 'eggs' },
+            { type: 'ingredient', name: 'oat milk', quantity: '1%l' },
+        ]);
+    });
+
+    it('removes all free-hand lines but keeps recipes and drops their ticks', async () => {
+        const { store, files, api } = makeStore();
+        api.generate = async () => ({ categories: [], other: { name: 'other', items: [{ name: 'flour', quantities: '' }] }, pantryItems: [] });
+        files.files.set(LIST_FILE, JSON.stringify({ items: [
+            { type: 'ingredient', name: 'milk' },
+            { type: 'recipe', path: 'a.cook', children: [] },
+            { type: 'ingredient', name: 'bread' },
+        ] }));
+        files.files.set(CHECKED_FILE, '+ flour\n+ milk\n');
+        await store.load();
+        await store.removeAllFreeHand();
+        assert.strictEqual(files.files.get(LIST_FILE), 'a.cook\n');
+        assert.strictEqual(files.files.get(CHECKED_FILE), '+ flour\n');
     });
 
     it('keeps the ticks of free-hand items when compacting the checked log', async () => {
