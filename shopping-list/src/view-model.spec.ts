@@ -46,9 +46,9 @@ describe('view model', () => {
             { type: 'recipe', path: 'Soup.cook', children: [{ type: 'ingredient', name: 'salt' }] },
             { type: 'ingredient', name: 'milk', quantity: '2%l' },
             { type: 'ingredient', name: 'bread' },
-        ]), [
-            { ref: { index: 1, name: 'milk', quantity: '2%l' }, quantity: '2 l' },
-            { ref: { index: 2, name: 'bread' }, quantity: '' },
+        ], ref => `edit ${ref.name}`), [
+            { ref: { index: 1, name: 'milk', quantity: '2%l' }, quantity: '2 l', editText: 'edit milk' },
+            { ref: { index: 2, name: 'bread' }, quantity: '', editText: 'edit bread' },
         ]);
     });
 });

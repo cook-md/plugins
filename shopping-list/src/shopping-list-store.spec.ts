@@ -262,7 +262,7 @@ describe('ShoppingListStore', () => {
         await store.addRecipe('pasta.cook', 1);
         const added = await store.addFreeHand([
             { name: 'Milk', quantity: '1%l' }, { name: 'bread' }, { name: 'milk', quantity: '0.5%l' },
-            { name: 'Bread' }, { name: 'milk', quantity: '200%ml' }, { name: '  {}  ' }, { name: './half--and--half' },
+            { name: 'Bread' }, { name: 'milk', quantity: '200%ml' }, { name: '  ' }, { name: 'half-and-half' },
         ]);
         assert.deepStrictEqual(added, ['Milk', 'bread', 'Milk', 'bread', 'milk', 'half-and-half']);
         const saved = JSON.parse(files.files.get(LIST_FILE) ?? '') as ShoppingListFile;
@@ -273,6 +273,17 @@ describe('ShoppingListStore', () => {
             { type: 'ingredient', name: 'milk', quantity: '200%ml' },
             { type: 'ingredient', name: 'half-and-half' },
         ]);
+    });
+
+    it('puts the list back when saving a change fails', async () => {
+        const { store, files } = makeStore();
+        await store.addFreeHand([{ name: 'milk', quantity: '1%l' }]);
+        const saved = files.files.get(LIST_FILE);
+        files.write = async () => { throw new Error('Invalid arguments: refused'); };
+        await assert.rejects(store.addFreeHand([{ name: 'bread' }, { name: 'milk', quantity: '1%l' }]), /refused/);
+        await assert.rejects(store.removeAllFreeHand(), /refused/);
+        assert.deepStrictEqual(store.getItems(), [{ type: 'ingredient', name: 'milk', quantity: '1%l' }]);
+        assert.strictEqual(files.files.get(LIST_FILE), saved);
     });
 
     it('unticks a name when more of it is added', async () => {
@@ -302,7 +313,7 @@ describe('ShoppingListStore', () => {
         await store.removeFreeHand({ index: 2, name: 'bread' });
         // A line that is gone is left alone.
         await store.removeFreeHand({ index: 0, name: 'butter' });
-        await store.editFreeHand({ index: 0, name: 'eggs' }, { name: '{}' });
+        await store.editFreeHand({ index: 0, name: 'eggs' }, { name: ' ' });
         assert.deepStrictEqual((JSON.parse(files.files.get(LIST_FILE) ?? '') as ShoppingListFile).items, [
             { type: 'ingredient', name: 'eggs' },
             { type: 'ingredient', name: 'oat milk', quantity: '1%l' },

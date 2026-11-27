@@ -3,13 +3,16 @@ import * as vscode from 'vscode';
 import { CooklangApi } from './cooklang-api';
 import { isMenuPath, parseAddRecipesRequest, RecipeTarget, resolveTargets, TargetResolver } from './command-args';
 import { ResolvedRecipeReference } from './cooklang-api';
-import { editedLine, recognizeLine } from './free-hand';
+import { editedLine, editText, recognizeLine, recognizeList, RecognizedLine } from './ingredients';
 import { FreeHandRef, FromWebview, ToWebview, ViewState } from './protocol';
 import { ListFiles, ShoppingListStore } from './shopping-list-store';
+import { freeHandRows } from './view-model';
 
 const VIEW_ID = 'shoppingList.view';
+const AISLE_FILE = 'config/aisle.conf';
 /** Bounds on what the webview may send in one message. */
 const MAX_LINE_LENGTH = 500;
+const MAX_PASTE_LENGTH = 20_000;
 const MAX_PASTED_LINES = 200;
 
 /** `workspace.fs` at one root, by file name. */
@@ -53,7 +56,10 @@ function isValidMessage(message: unknown): message is FromWebview {
     if (typeof message !== 'object' || message === null) {
         return false;
     }
-    const m = message as { type?: unknown; index?: unknown; scale?: unknown; name?: unknown; lines?: unknown; line?: unknown; item?: unknown };
+    const m = message as {
+        type?: unknown; index?: unknown; scale?: unknown; name?: unknown; line?: unknown; item?: unknown;
+        seq?: unknown; text?: unknown; keep?: unknown;
+    };
     const isIndex = (value: unknown): boolean => Number.isInteger(value) && (value as number) >= 0;
     const isLine = (value: unknown): boolean => typeof value === 'string' && value.length <= MAX_LINE_LENGTH;
     const isRef = (value: unknown): value is FreeHandRef => {
@@ -67,7 +73,10 @@ function isValidMessage(message: unknown): message is FromWebview {
         case 'remove': return isIndex(m.index);
         case 'scale': return isIndex(m.index) && typeof m.scale === 'number' && Number.isFinite(m.scale) && m.scale > 0;
         case 'toggle': return typeof m.name === 'string' && m.name.trim() !== '';
-        case 'addItems': return Array.isArray(m.lines) && m.lines.length <= MAX_PASTED_LINES && m.lines.every(isLine);
+        case 'addLine': return isLine(m.line);
+        case 'recognize': return Number.isInteger(m.seq) && isLine(m.text);
+        case 'previewPaste': return typeof m.text === 'string' && m.text.length <= MAX_PASTE_LENGTH;
+        case 'addPasted': return Array.isArray(m.keep) && m.keep.length <= MAX_PASTED_LINES && m.keep.every(isIndex);
         case 'editItem': return isRef(m.item) && isLine(m.line);
         case 'removeItem': return isRef(m.item);
         case 'removeAllItems': return true;
@@ -82,6 +91,10 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
     protected storeDisposables: vscode.Disposable[] = [];
     protected view: vscode.WebviewView | undefined;
     protected freeHandSupported = false;
+    /** `config/aisle.conf`, so typed names take its spelling (`Tomato` → `tomatoes`). */
+    protected aisleText: string | undefined;
+    /** Lines of the last paste, until the view adds or drops them. */
+    protected pastedRows: RecognizedLine[] = [];
 
     constructor(protected readonly context: vscode.ExtensionContext, protected readonly api: CooklangApi) { }
 
@@ -133,7 +146,12 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
         this.store = store;
         const watcher = vscode.workspace.createFileSystemWatcher(
             new vscode.RelativePattern(folder, '{.shopping-list,.shopping-checked,config/aisle.conf,config/pantry.conf}'));
-        const reload = (): void => store.scheduleReload();
+        const files = new WorkspaceListFiles(folder.uri);
+        const loadAisle = (): void => {
+            files.read(AISLE_FILE).then(text => { this.aisleText = text; }, () => { this.aisleText = undefined; });
+        };
+        loadAisle();
+        const reload = (): void => { loadAisle(); store.scheduleReload(); };
         this.storeDisposables = [
             watcher,
             watcher.onDidChange(reload),
@@ -265,7 +283,17 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
         if (!store) {
             return;
         }
-        if (!this.freeHandSupported && ['addItems', 'editItem', 'removeItem', 'removeAllItems'].includes(message.type)) {
+        if (!this.freeHandSupported && message.type !== 'remove' && message.type !== 'scale' && message.type !== 'clear' && message.type !== 'toggle') {
+            return;
+        }
+        // Reading text needs no store queue; answer straight away.
+        if (message.type === 'recognize') {
+            this.post({ type: 'recognized', seq: message.seq, chip: recognizeLine(message.text, this.aisleText)?.chip });
+            return;
+        }
+        if (message.type === 'previewPaste') {
+            this.pastedRows = recognizeList(message.text, this.aisleText).slice(0, MAX_PASTED_LINES);
+            this.post({ type: 'pastePreview', rows: this.pastedRows.map(row => row.chip ? { name: row.name, chip: row.chip } : { name: row.name }) });
             return;
         }
         await this.run(async () => {
@@ -274,7 +302,13 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
                 case 'scale': return store.updateScale(message.index, message.scale);
                 case 'clear': return store.clearAll();
                 case 'toggle': return store.toggleItem(message.name);
-                case 'addItems': return this.addItems(store, message.lines);
+                case 'addLine': return this.addLines(store, recognizeLine(message.line, this.aisleText) ?? []);
+                case 'addPasted': {
+                    const keep = new Set(message.keep);
+                    const rows = this.pastedRows.filter((_, index) => keep.has(index));
+                    this.pastedRows = [];
+                    return this.addLines(store, rows);
+                }
                 case 'editItem': return this.editItem(store, message.item, message.line);
                 case 'removeItem': return store.removeFreeHand(message.item);
                 case 'removeAllItems': return store.removeAllFreeHand();
@@ -282,17 +316,21 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
         });
     }
 
-    protected async addItems(store: ShoppingListStore, lines: readonly string[]): Promise<void> {
-        const added = await store.addFreeHand(lines.flatMap(line => recognizeLine(line) ?? []));
-        if (added.length > 0 && this.view) {
-            const message: ToWebview = { type: 'added', names: added };
-            this.view.webview.postMessage(message);
+    protected async addLines(store: ShoppingListStore, lines: RecognizedLine | readonly RecognizedLine[]): Promise<void> {
+        const list = Array.isArray(lines) ? lines : [lines];
+        const added = await store.addFreeHand(list.map(line => line.quantity === undefined ? { name: line.name } : { name: line.name, quantity: line.quantity }));
+        if (added.length > 0) {
+            this.post({ type: 'added', names: added });
         }
+    }
+
+    protected post(message: ToWebview): void {
+        this.view?.webview.postMessage(message);
     }
 
     /** An edit that leaves no name is a delete; an untouched one changes nothing. */
     protected async editItem(store: ShoppingListStore, item: FreeHandRef, text: string): Promise<void> {
-        const line = editedLine(item, text);
+        const line = editedLine(item, text, this.aisleText);
         if (line === 'unchanged') {
             return;
         }
@@ -326,8 +364,9 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
                 checked: store.getCheckedNames(),
                 error: store.getError(),
                 canEditItems: this.freeHandSupported,
+                freeHand: freeHandRows(store.getItems(), editText),
             }
-            : { hasWorkspace: false, items: [], checked: [], canEditItems: false };
+            : { hasWorkspace: false, items: [], checked: [], canEditItems: false, freeHand: [] };
         const message: ToWebview = { type: 'state', state };
         this.view.webview.postMessage(message);
     }

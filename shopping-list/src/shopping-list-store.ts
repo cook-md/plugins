@@ -2,7 +2,7 @@ import {
     CheckEntry, CooklangApi, ResolvedRecipeReference, ShoppingListEntry, ShoppingListFile, ShoppingListIngredientItem, ShoppingListRecipeItem,
     ShoppingListResult,
 } from './cooklang-api';
-import { cleanName, cleanQuantity, FreeHandLine, placeFreeHand } from './free-hand';
+import { addQuantities, FreeHandLine } from './ingredients';
 
 /** A top-level free-hand line as a caller last saw it. */
 export interface FreeHandRef {
@@ -218,27 +218,18 @@ export class ShoppingListStore {
     protected async doAddFreeHand(lines: readonly FreeHandLine[]): Promise<string[]> {
         this.assertListWritable();
         const added: string[] = [];
-        for (const raw of lines) {
-            const line = cleanLine(raw);
-            if (!line) {
-                continue;
-            }
-            const place = placeFreeHand(this.list.items, line);
-            if (place) {
-                const existing = this.list.items[place.index] as ShoppingListIngredientItem;
-                if (place.quantity !== undefined) {
-                    existing.quantity = place.quantity;
+        await this.mutateList(async () => {
+            for (const line of lines) {
+                if (line.name.trim() === '') {
+                    continue;
                 }
-                added.push(existing.name);
-            } else {
-                this.list.items.push(toIngredientItem(line));
-                added.push(line.name);
+                added.push(this.placeFreeHand(line));
             }
-        }
+            return added.length > 0;
+        });
         if (added.length === 0) {
             return added;
         }
-        await this.save();
         for (const name of new Set(added.map(name => name.toLowerCase()))) {
             if (this.checkedSet.has(name)) {
                 await this.appendCheckEntry({ type: 'unchecked', name });
@@ -248,15 +239,40 @@ export class ShoppingListStore {
         return added;
     }
 
-    protected async doEditFreeHand(ref: FreeHandRef, raw: FreeHandLine): Promise<void> {
+    /**
+     * Folds `line` into a top-level free-hand line of the same name (ignoring
+     * case) when their amounts add up, else appends it. Returns the name as listed.
+     */
+    protected placeFreeHand(line: FreeHandLine): string {
+        const key = line.name.toLowerCase();
+        for (const item of this.list.items) {
+            if (item.type !== 'ingredient' || item.name.toLowerCase() !== key) {
+                continue;
+            }
+            const sum = addQuantities(item.quantity, line.quantity);
+            if (sum !== 'not-addable') {
+                if (sum === undefined) {
+                    delete item.quantity;
+                } else {
+                    item.quantity = sum;
+                }
+                return item.name;
+            }
+        }
+        this.list.items.push(toIngredientItem(line));
+        return line.name;
+    }
+
+    protected async doEditFreeHand(ref: FreeHandRef, line: FreeHandLine): Promise<void> {
         this.assertListWritable();
         const index = this.findFreeHand(ref);
-        const line = cleanLine(raw);
-        if (index === undefined || !line) {
+        if (index === undefined || line.name.trim() === '') {
             return;
         }
-        this.list.items[index] = toIngredientItem(line);
-        await this.save();
+        await this.mutateList(async () => {
+            this.list.items[index] = toIngredientItem(line);
+            return true;
+        });
         await this.regenerate();
         await this.compactCheckedLog();
     }
@@ -267,8 +283,10 @@ export class ShoppingListStore {
         if (index === undefined) {
             return;
         }
-        this.list.items.splice(index, 1);
-        await this.save();
+        await this.mutateList(async () => {
+            this.list.items.splice(index, 1);
+            return true;
+        });
         await this.regenerate();
         await this.compactCheckedLog();
     }
@@ -279,10 +297,29 @@ export class ShoppingListStore {
         if (kept.length === this.list.items.length) {
             return;
         }
-        this.list.items = kept;
-        await this.save();
+        await this.mutateList(async () => {
+            this.list.items = kept;
+            return true;
+        });
         await this.regenerate();
         await this.compactCheckedLog();
+    }
+
+    /**
+     * Runs `change` on the in-memory list and saves it when `change` returns
+     * true. A failed save (the editor refuses a line, the disk is full) puts
+     * the list back as it was, so memory never drifts from the file.
+     */
+    protected async mutateList(change: () => Promise<boolean>): Promise<void> {
+        const before: ShoppingListFile = JSON.parse(JSON.stringify(this.list));
+        try {
+            if (await change()) {
+                await this.save();
+            }
+        } catch (e) {
+            this.list = before;
+            throw e;
+        }
     }
 
     /**
@@ -456,16 +493,6 @@ function toRecipeItem(reference: ResolvedRecipeReference): ShoppingListRecipeIte
         multiplier: reference.scale === 1 ? undefined : reference.scale,
         children: (reference.children ?? []).map(toRecipeItem),
     };
-}
-
-/** `line` cleaned so it reads back unchanged, or undefined when no name is left. */
-function cleanLine(line: FreeHandLine): FreeHandLine | undefined {
-    const name = cleanName(line.name);
-    if (name === '') {
-        return undefined;
-    }
-    const quantity = cleanQuantity(line.quantity);
-    return quantity === undefined ? { name } : { name, quantity };
 }
 
 function toIngredientItem(line: FreeHandLine): ShoppingListIngredientItem {

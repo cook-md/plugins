@@ -1,6 +1,5 @@
-import { displayQuantity, editText, recognizeLine, splitPastedText } from '../free-hand';
 import type { FreeHandRef, FromWebview, ToWebview, ViewState } from '../protocol';
-import { displayCategories, freeHandRows, recipeRows } from '../view-model';
+import { displayCategories, recipeRows } from '../view-model';
 
 declare function acquireVsCodeApi(): { postMessage(message: FromWebview): void };
 
@@ -11,6 +10,8 @@ const composer = document.getElementById('composer')!;
 
 /** How long rows just added stay highlighted. */
 const HIGHLIGHT_MS = 2000;
+/** Wait after a keystroke before asking the extension for the amount chip. */
+const RECOGNIZE_DEBOUNCE_MS = 120;
 
 let lastState: ViewState | undefined;
 let pantryExpanded = false;
@@ -20,8 +21,11 @@ let editing: { ref: FreeHandRef; draft: string } | undefined;
 let highlighted = new Set<string>();
 let highlightTimer: ReturnType<typeof setTimeout> | undefined;
 let scrollToHighlight = false;
-/** Lines from a multi-line paste, waiting for "Add items". */
-let pasted: string[] = [];
+/** Rows of a multi-line paste as the extension read them, and which are still kept. */
+let pasted: Array<{ name: string; chip?: string; kept: boolean }> = [];
+/** Matches `recognized` replies to the latest quick-add text; older replies are dropped. */
+let recognizeSeq = 0;
+let recognizeTimer: ReturnType<typeof setTimeout> | undefined;
 
 function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: string, text?: string): HTMLElementTagNameMap[K] {
     const node = document.createElement(tag);
@@ -58,22 +62,34 @@ form.append(input, chip, addButton);
 const preview = element('div', 'paste-preview');
 composer.append(form, preview);
 
-function updateChip(): void {
-    const quantity = displayQuantity(recognizeLine(input.value)?.quantity);
-    chip.textContent = quantity;
-    chip.hidden = quantity === '';
-    addButton.disabled = input.value.trim() === '';
+function showChip(text: string | undefined): void {
+    chip.textContent = text ?? '';
+    chip.hidden = !text;
 }
 
-function sendLines(lines: string[]): void {
-    if (lines.length > 0) {
-        vscode.postMessage({ type: 'addItems', lines });
+/** The extension reads the amount; the chip shows its answer for the latest text only. */
+function updateChip(): void {
+    addButton.disabled = input.value.trim() === '';
+    const seq = ++recognizeSeq;
+    if (recognizeTimer !== undefined) {
+        clearTimeout(recognizeTimer);
     }
+    if (input.value.trim() === '') {
+        showChip(undefined);
+        return;
+    }
+    recognizeTimer = setTimeout(() => {
+        recognizeTimer = undefined;
+        vscode.postMessage({ type: 'recognize', seq, text: input.value });
+    }, RECOGNIZE_DEBOUNCE_MS);
 }
 
 form.addEventListener('submit', event => {
     event.preventDefault();
-    sendLines(input.value.trim() === '' ? [] : [input.value]);
+    // The extension reads the text itself; adding never waits for the chip.
+    if (input.value.trim() !== '') {
+        vscode.postMessage({ type: 'addLine', line: input.value });
+    }
     input.value = '';
     updateChip();
 });
@@ -85,36 +101,45 @@ input.addEventListener('keydown', event => {
     }
 });
 input.addEventListener('paste', event => {
-    const lines = splitPastedText(event.clipboardData?.getData('text/plain') ?? '');
-    if (lines.length > 1) {
+    const text = event.clipboardData?.getData('text/plain') ?? '';
+    // One line pastes into the box as usual; several open a preview.
+    if (text.trim().split(/\r\n|\r|\n/).filter(line => line.trim() !== '').length > 1) {
         event.preventDefault();
-        pasted = lines;
-        renderPreview();
+        vscode.postMessage({ type: 'previewPaste', text });
     }
 });
 
 function renderPreview(): void {
+    const kept = pasted.filter(row => row.kept).length;
     preview.hidden = pasted.length === 0;
     if (pasted.length === 0) {
         preview.replaceChildren();
         return;
     }
     const list = element('ul', 'paste-list');
-    pasted.forEach((line, index) => {
-        const recognized = recognizeLine(line);
-        const row = element('li', 'paste-row');
-        row.append(
-            iconButton('paste-drop', '×', `Leave out ${line}`, () => { pasted.splice(index, 1); renderPreview(); }),
-            element('span', 'item-name', recognized?.name ?? line),
+    pasted.forEach(row => {
+        if (!row.kept) {
+            return;
+        }
+        const line = element('li', 'paste-row');
+        line.append(
+            iconButton('paste-drop', '×', `Leave out ${row.name}`, () => { row.kept = false; renderPreview(); }),
+            element('span', 'item-name', row.name),
         );
-        const quantity = displayQuantity(recognized?.quantity);
-        if (quantity) { row.append(element('span', 'quantity-chip', quantity)); }
-        list.append(row);
+        if (row.chip) { line.append(element('span', 'quantity-chip', row.chip)); }
+        list.append(line);
     });
     const actions = element('div', 'paste-actions');
-    const add = element('button', 'primary', pasted.length === 1 ? 'Add 1 item' : `Add ${pasted.length} items`);
+    const add = element('button', 'primary', kept === 1 ? 'Add 1 item' : `Add ${kept} items`);
     add.type = 'button';
-    add.addEventListener('click', () => { sendLines(pasted); pasted = []; renderPreview(); input.focus(); });
+    add.disabled = kept === 0;
+    add.addEventListener('click', () => {
+        const keep = pasted.flatMap((row, index) => row.kept ? [index] : []);
+        vscode.postMessage({ type: 'addPasted', keep });
+        pasted = [];
+        renderPreview();
+        input.focus();
+    });
     const cancel = element('button', 'secondary', 'Cancel');
     cancel.type = 'button';
     cancel.addEventListener('click', () => { pasted = []; renderPreview(); input.focus(); });
@@ -170,7 +195,7 @@ function renderRecipes(state: ViewState): HTMLElement | undefined {
 
 /** The free-hand lines, editable: what the iOS app calls "Other items". */
 function renderFreeHand(state: ViewState): HTMLElement | undefined {
-    const rows = freeHandRows(state.items);
+    const rows = state.freeHand;
     if (editing && !rows.some(row => sameRef(row.ref, editing!.ref))) {
         editing = undefined;
     }
@@ -215,7 +240,7 @@ function renderFreeHand(state: ViewState): HTMLElement | undefined {
         if (row.quantity) { line.append(element('span', 'ingredient-qty', row.quantity)); }
         if (state.canEditItems) {
             const startEdit = (): void => {
-                editing = { ref: row.ref, draft: editText(row.ref) };
+                editing = { ref: row.ref, draft: row.editText };
                 rerender();
             };
             label.title = 'Double-click to edit';
@@ -324,6 +349,13 @@ window.addEventListener('message', (event: MessageEvent<ToWebview>) => {
         render(event.data.state);
     } else if (event.data?.type === 'added') {
         highlight(event.data.names);
+    } else if (event.data?.type === 'recognized') {
+        if (event.data.seq === recognizeSeq) {
+            showChip(event.data.chip);
+        }
+    } else if (event.data?.type === 'pastePreview') {
+        pasted = event.data.rows.map(row => ({ ...row, kept: true }));
+        renderPreview();
     }
 });
 composer.hidden = true;
