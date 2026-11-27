@@ -3,7 +3,7 @@ import * as vscode from 'vscode';
 import { CooklangApi } from './cooklang-api';
 import { isMenuPath, parseAddRecipesRequest, RecipeTarget, resolveTargets, TargetResolver } from './command-args';
 import { ResolvedRecipeReference } from './cooklang-api';
-import { recognizeLine } from './free-hand';
+import { editedLine, recognizeLine } from './free-hand';
 import { FreeHandRef, FromWebview, ToWebview, ViewState } from './protocol';
 import { ListFiles, ShoppingListStore } from './shopping-list-store';
 
@@ -81,6 +81,7 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
     protected store: ShoppingListStore | undefined;
     protected storeDisposables: vscode.Disposable[] = [];
     protected view: vscode.WebviewView | undefined;
+    protected freeHandSupported = false;
 
     constructor(protected readonly context: vscode.ExtensionContext, protected readonly api: CooklangApi) { }
 
@@ -97,6 +98,7 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
             { dispose: () => this.closeStore() },
         );
         this.openStore();
+        this.detectFreeHandSupport().catch(err => console.error('[shopping-list] free-hand check failed:', err));
     }
 
     resolveWebviewView(view: vscode.WebviewView): void {
@@ -263,6 +265,9 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
         if (!store) {
             return;
         }
+        if (!this.freeHandSupported && ['addItems', 'editItem', 'removeItem', 'removeAllItems'].includes(message.type)) {
+            return;
+        }
         await this.run(async () => {
             switch (message.type) {
                 case 'remove': return store.removeRecipe(message.index);
@@ -285,10 +290,27 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
         }
     }
 
-    /** An edit that leaves no name is a delete. */
+    /** An edit that leaves no name is a delete; an untouched one changes nothing. */
     protected async editItem(store: ShoppingListStore, item: FreeHandRef, text: string): Promise<void> {
-        const line = recognizeLine(text);
+        const line = editedLine(item, text);
+        if (line === 'unchanged') {
+            return;
+        }
         await (line ? store.editFreeHand(item, line) : store.removeFreeHand(item));
+    }
+
+    /**
+     * Whether this editor's API keeps free-hand lines. Older ones parse them
+     * away and refuse to write them, so adding one would fail.
+     */
+    protected async detectFreeHandSupport(): Promise<void> {
+        try {
+            const parsed = await this.api.parseShoppingList('x\n');
+            this.freeHandSupported = parsed.items[0]?.type === 'ingredient';
+        } catch {
+            this.freeHandSupported = false;
+        }
+        this.postState();
     }
 
     protected postState(): void {
@@ -303,8 +325,9 @@ export class ShoppingListController implements vscode.WebviewViewProvider {
                 result: store.getResult(),
                 checked: store.getCheckedNames(),
                 error: store.getError(),
+                canEditItems: this.freeHandSupported,
             }
-            : { hasWorkspace: false, items: [], checked: [] };
+            : { hasWorkspace: false, items: [], checked: [], canEditItems: false };
         const message: ToWebview = { type: 'state', state };
         this.view.webview.postMessage(message);
     }

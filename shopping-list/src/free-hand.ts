@@ -3,7 +3,7 @@
 // import, so the webview bundles it too. Behaviour follows the iOS app's
 // manual items.
 
-import type { ShoppingListEntry, ShoppingListIngredientItem } from './cooklang-api';
+import type { ShoppingListEntry } from './cooklang-api';
 
 /** A free-hand line as the store writes it. */
 export interface FreeHandLine {
@@ -244,7 +244,27 @@ export function placeFreeHand(items: readonly ShoppingListEntry[], line: FreeHan
 }
 
 /** How a free-hand line reads back in an edit box: `Milk 2 l`. */
-export function editText(item: ShoppingListIngredientItem): string {
+export function editText(item: FreeHandLine): string {
     const quantity = displayQuantity(item.quantity);
     return quantity === '' ? item.name : `${item.name} ${quantity}`;
+}
+
+/**
+ * The line an edit box's `text` asks for, given the line it started from.
+ * `'unchanged'` when the text was not touched, so lines other tools wrote
+ * (`salt{a pinch}`, `Heinz 57`) are never re-read. While the text still ends
+ * with the old amount, that amount is kept exactly as stored, units the
+ * recognizer does not know included. Undefined when no name is left.
+ */
+export function editedLine(original: FreeHandLine, text: string): FreeHandLine | 'unchanged' | undefined {
+    const trimmed = text.trim().replace(/\s+/g, ' ');
+    if (trimmed === editText(original).replace(/\s+/g, ' ')) {
+        return 'unchanged';
+    }
+    const oldAmount = displayQuantity(original.quantity);
+    if (original.quantity !== undefined && oldAmount !== '' && trimmed.endsWith(` ${oldAmount}`)) {
+        const name = cleanName(trimmed.slice(0, -oldAmount.length));
+        return name === '' ? undefined : { name, quantity: original.quantity };
+    }
+    return recognizeLine(trimmed);
 }

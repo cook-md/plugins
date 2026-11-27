@@ -9,6 +9,8 @@ export interface ViewState {
     /** Lower-cased checked ingredient names. */
     checked: string[];
     error?: string;
+    /** False on editors whose API drops free-hand lines: no quick add, no editing. */
+    canEditItems: boolean;
 }
 
 export type ToWebview =

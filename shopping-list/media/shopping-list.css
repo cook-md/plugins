@@ -191,7 +191,8 @@ body {
 }
 
 .free-hand-row:last-child { border-bottom: none; }
-.free-hand-row .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; cursor: text; }
+.free-hand-row .item-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.free-hand-row .item-name.editable { cursor: text; }
 .free-hand-row .icon-button.edit { visibility: hidden; }
 .free-hand-row:hover .icon-button.edit, .free-hand-row:focus-within .icon-button.edit { visibility: visible; }
 

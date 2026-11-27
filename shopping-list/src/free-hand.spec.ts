@@ -1,7 +1,7 @@
 import * as assert from 'assert';
 import type { ShoppingListEntry } from './cooklang-api';
 import {
-    cleanName, cleanQuantity, displayQuantity, editText, formatStoredQuantity, parseStoredQuantity, placeFreeHand, recognizeLine, splitPastedText,
+    cleanName, cleanQuantity, displayQuantity, editedLine, editText, formatStoredQuantity, parseStoredQuantity, placeFreeHand, recognizeLine, splitPastedText,
 } from './free-hand';
 
 describe('free-hand', () => {
@@ -56,7 +56,7 @@ describe('free-hand', () => {
         assert.strictEqual(formatStoredQuantity(3), '3');
         assert.strictEqual(displayQuantity('2%l'), '2 l');
         assert.strictEqual(displayQuantity(undefined), '');
-        assert.strictEqual(editText({ type: 'ingredient', name: 'Milk', quantity: '2%l' }), 'Milk 2 l');
+        assert.strictEqual(editText({ name: 'Milk', quantity: '2%l' }), 'Milk 2 l');
     });
 
     it('splits pasted text into lines, dropping list markers', () => {
@@ -77,5 +77,19 @@ describe('free-hand', () => {
         assert.strictEqual(placeFreeHand(items, { name: 'milk' }), undefined);
         assert.strictEqual(placeFreeHand(items, { name: 'salt', quantity: 'to taste' }), undefined);
         assert.strictEqual(placeFreeHand(items, { name: 'Pasta.cook' }), undefined);
+    });
+
+    it('edits without re-reading what was not changed', () => {
+        // Lines other tools wrote, saved as they are.
+        assert.strictEqual(editedLine({ name: 'salt', quantity: 'a pinch' }, 'salt a pinch'), 'unchanged');
+        assert.strictEqual(editedLine({ name: 'wine', quantity: '1%glass' }, ' wine  1 glass '), 'unchanged');
+        assert.strictEqual(editedLine({ name: 'Heinz 57' }, 'Heinz 57'), 'unchanged');
+        // A new name keeps the stored amount verbatim, even one the recognizer does not know.
+        assert.deepStrictEqual(editedLine({ name: 'salt', quantity: 'a pinch' }, 'sea salt a pinch'), { name: 'sea salt', quantity: 'a pinch' });
+        assert.deepStrictEqual(editedLine({ name: 'wine', quantity: '1%glass' }, 'red wine 1 glass'), { name: 'red wine', quantity: '1%glass' });
+        // A new amount is read as typed.
+        assert.deepStrictEqual(editedLine({ name: 'milk', quantity: '2%l' }, 'milk 3 l'), { name: 'milk', quantity: '3%l' });
+        assert.deepStrictEqual(editedLine({ name: 'salt', quantity: 'a pinch' }, 'salt'), { name: 'salt' });
+        assert.strictEqual(editedLine({ name: 'salt', quantity: 'a pinch' }, '  '), undefined);
     });
 });

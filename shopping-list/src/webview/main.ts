@@ -1,4 +1,4 @@
-import { displayQuantity, recognizeLine, splitPastedText } from '../free-hand';
+import { displayQuantity, editText, recognizeLine, splitPastedText } from '../free-hand';
 import type { FreeHandRef, FromWebview, ToWebview, ViewState } from '../protocol';
 import { displayCategories, freeHandRows, recipeRows } from '../view-model';
 
@@ -179,10 +179,10 @@ function renderFreeHand(state: ViewState): HTMLElement | undefined {
     }
     const section = element('div', 'free-hand');
     const header = element('div', 'section-header');
-    header.append(
-        element('h3', 'section-title', 'Other Items'),
-        iconButton('remove-all', 'Remove all', 'Remove all other items (recipes stay)', () => vscode.postMessage({ type: 'removeAllItems' })),
-    );
+    header.append(element('h3', 'section-title', 'Other Items'));
+    if (state.canEditItems) {
+        header.append(iconButton('remove-all', 'Remove all', 'Remove all other items (recipes stay)', () => vscode.postMessage({ type: 'removeAllItems' })));
+    }
     section.append(header);
     for (const row of rows) {
         const line = element('div', highlighted.has(row.ref.name.toLowerCase()) ? 'free-hand-row just-added' : 'free-hand-row');
@@ -196,6 +196,8 @@ function renderFreeHand(state: ViewState): HTMLElement | undefined {
             const save = (): void => {
                 editing = undefined;
                 vscode.postMessage({ type: 'editItem', item: current.ref, line: edit.value });
+                // An untouched edit changes nothing, so no new state would close the box.
+                rerender();
             };
             edit.addEventListener('input', () => { current.draft = edit.value; });
             edit.addEventListener('keydown', event => {
@@ -209,18 +211,21 @@ function renderFreeHand(state: ViewState): HTMLElement | undefined {
             continue;
         }
         const label = element('span', 'item-name', row.ref.name);
-        label.title = 'Double-click to edit';
-        const startEdit = (): void => {
-            editing = { ref: row.ref, draft: row.quantity ? `${row.ref.name} ${row.quantity}` : row.ref.name };
-            rerender();
-        };
-        label.addEventListener('dblclick', startEdit);
         line.append(label);
         if (row.quantity) { line.append(element('span', 'ingredient-qty', row.quantity)); }
-        line.append(
-            iconButton('edit', '✎', `Edit ${row.ref.name}`, startEdit),
-            iconButton('remove', '×', `Remove ${row.ref.name}`, () => vscode.postMessage({ type: 'removeItem', item: row.ref })),
-        );
+        if (state.canEditItems) {
+            const startEdit = (): void => {
+                editing = { ref: row.ref, draft: editText(row.ref) };
+                rerender();
+            };
+            label.title = 'Double-click to edit';
+            label.classList.add('editable');
+            label.addEventListener('dblclick', startEdit);
+            line.append(
+                iconButton('edit', '✎', `Edit ${row.ref.name}`, startEdit),
+                iconButton('remove', '×', `Remove ${row.ref.name}`, () => vscode.postMessage({ type: 'removeItem', item: row.ref })),
+            );
+        }
         section.append(line);
     }
     return section;
@@ -274,7 +279,7 @@ function renderResult(state: ViewState): HTMLElement[] {
 
 function render(state: ViewState): void {
     lastState = state;
-    composer.hidden = !state.hasWorkspace;
+    composer.hidden = !state.hasWorkspace || !state.canEditItems;
     if (!state.hasWorkspace) {
         root.replaceChildren(element('div', 'empty', 'Open a recipe folder to use the shopping list.'));
         return;
@@ -282,7 +287,9 @@ function render(state: ViewState): void {
     const result = renderResult(state);
     const parts = [renderToolbar(state), renderRecipes(state), renderFreeHand(state)].filter((node): node is HTMLElement => node !== undefined);
     if (state.items.length === 0 && !state.error) {
-        parts.push(element('div', 'empty', 'Your shopping list is empty. Type an item above, or add recipes from the preview, the explorer, or the editor title bar.'));
+        parts.push(element('div', 'empty', state.canEditItems
+            ? 'Your shopping list is empty. Type an item above, or add recipes from the preview, the explorer, or the editor title bar.'
+            : 'No recipes yet. Add recipes from the preview, the explorer, or the editor title bar.'));
     }
     // Errors come first so they are visible whether or not anything is listed.
     root.replaceChildren(...(state.error ? [...result, ...parts] : [...parts, ...result]));
