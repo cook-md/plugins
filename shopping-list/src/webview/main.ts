@@ -15,7 +15,8 @@ function element<K extends keyof HTMLElementTagNameMap>(tag: K, className?: stri
 }
 
 function renderRecipes(state: ViewState): HTMLElement | undefined {
-    if (state.items.length === 0) {
+    const rows = recipeRows(state.items);
+    if (rows.length === 0) {
         // With an error (e.g. an unreadable .shopping-list) the error block explains the empty list.
         return state.error
             ? undefined
@@ -28,7 +29,7 @@ function renderRecipes(state: ViewState): HTMLElement | undefined {
     clear.addEventListener('click', () => vscode.postMessage({ type: 'clear' }));
     header.append(clear);
     section.append(header);
-    for (const row of recipeRows(state.items)) {
+    for (const row of rows) {
         const line = element('div', 'recipe-row');
         const main = element('div', 'recipe-main');
         main.append(element('span', 'recipe-name', row.name));

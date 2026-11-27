@@ -20,6 +20,17 @@ describe('view model', () => {
         ]);
     });
 
+    it('skips free-hand lines but keeps indexes into the full list', () => {
+        assert.deepStrictEqual(recipeRows([
+            { type: 'ingredient', name: 'milk', quantity: '2%l' },
+            { type: 'recipe', path: 'Week.menu', children: [
+                { type: 'recipe', path: 'a', children: [] }, { type: 'ingredient', name: 'olive oil' },
+            ] },
+        ]), [
+            { index: 1, name: 'Week', scale: 1, detail: 'menu (1 recipes)' },
+        ]);
+    });
+
     it('drops empty aisles and appends sorted uncategorised items', () => {
         assert.deepStrictEqual(displayCategories({
             categories: [{ name: 'produce', items: [{ name: 'garlic', quantities: '3' }] }, { name: 'dairy', items: [] }],

@@ -1,10 +1,10 @@
-import type { ShoppingListRecipeItem, ShoppingListResult } from './cooklang-api';
+import type { ShoppingListEntry, ShoppingListResult } from './cooklang-api';
 
 /** Everything the webview renders. */
 export interface ViewState {
     /** False when no folder is open. */
     hasWorkspace: boolean;
-    items: ShoppingListRecipeItem[];
+    items: ShoppingListEntry[];
     result?: ShoppingListResult;
     /** Lower-cased checked ingredient names. */
     checked: string[];

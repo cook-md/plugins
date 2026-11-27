@@ -30,11 +30,28 @@ export interface ShoppingListRecipeItem {
     path: string;
     /** Undefined means 1. */
     multiplier?: number;
-    children: ShoppingListRecipeItem[];
+    children: ShoppingListEntry[];
+    /** A nested `? ./path` selection line. */
+    optional?: boolean;
 }
 
+/**
+ * A free-hand line (`milk{2%l}`, `bread`) written by CookCLI or the mobile
+ * apps. Older editors drop these; keep them when editing the list.
+ */
+export interface ShoppingListIngredientItem {
+    type: 'ingredient';
+    name: string;
+    /** Raw quantity text: `2%l`, `3`, `a pinch`. */
+    quantity?: string;
+    /** A nested `? name{quantity}` selection line. */
+    optional?: boolean;
+}
+
+export type ShoppingListEntry = ShoppingListRecipeItem | ShoppingListIngredientItem;
+
 export interface ShoppingListFile {
-    items: ShoppingListRecipeItem[];
+    items: ShoppingListEntry[];
 }
 
 export interface CheckEntry {
