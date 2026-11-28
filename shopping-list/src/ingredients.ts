@@ -5,12 +5,13 @@
 import * as fs from 'fs';
 import * as path from 'path';
 import * as glue from '@cooklang/cooklang/pkg/cooklang_wasm_bg.js';
-import type { ParsedIngredient } from '@cooklang/cooklang/pkg/cooklang_wasm';
+import type { ParsedIngredient, Quantity } from '@cooklang/cooklang/pkg/cooklang_wasm';
 
 /** The package imports its `.wasm` as an ES module, which Node cannot load; the build copies it next to this file instead. */
 const WASM_FILE = 'cooklang_wasm_bg.wasm';
 
 let loaded = false;
+let parser: glue.Parser | undefined;
 
 function load(): void {
     if (loaded) {
@@ -24,6 +25,22 @@ function load(): void {
         start();
     }
     loaded = true;
+}
+
+/**
+ * A stored quantity (`2%l`, `1/2%cup`, `a pinch`) read the way Cooklang reads
+ * `@x{2%l}`. Undefined when it does not read back as the same text (`2}%l`):
+ * such a quantity is kept as it is, never added to or shown in an edit box.
+ */
+function toQuantity(stored: string): Quantity | undefined {
+    parser ??= new glue.Parser();
+    try {
+        const ingredients = parser.parse(`@x{${stored}}`).recipe.ingredients;
+        const quantity = ingredients.length === 1 ? ingredients[0].quantity : undefined;
+        return quantity && glue.quantity_to_cooklang(quantity) === stored ? quantity : undefined;
+    } catch {
+        return undefined;
+    }
 }
 
 /** A free-hand line as written to `.shopping-list`. */
@@ -44,10 +61,10 @@ function toLine(parsed: ParsedIngredient): RecognizedLine | undefined {
     }
     const amount = parsed.amount;
     const quantity = amount ? glue.ingredient_amount_quantity(amount.value, amount.unit) : undefined;
-    if (!amount || quantity === undefined) {
+    if (!amount || !quantity) {
         return { name: parsed.name };
     }
-    return { name: parsed.name, quantity, chip: glue.ingredient_amount_chip(amount.value, amount.unit) };
+    return { name: parsed.name, quantity: glue.quantity_to_cooklang(quantity), chip: glue.ingredient_amount_chip(amount.value, amount.unit) };
 }
 
 /**
@@ -69,8 +86,17 @@ export function recognizeList(text: string, aisle?: string): RecognizedLine[] {
 /** The sum of two stored quantities with the same unit; `'not-addable'` for anything else. */
 export function addQuantities(a: string | undefined, b: string | undefined): string | undefined | 'not-addable' {
     load();
+    if (a === undefined && b === undefined) {
+        return undefined;
+    }
+    const first = a === undefined ? undefined : toQuantity(a);
+    const second = b === undefined ? undefined : toQuantity(b);
+    if ((a !== undefined && !first) || (b !== undefined && !second)) {
+        return 'not-addable';
+    }
     try {
-        return glue.add_ingredient_quantities(a, b) ?? undefined;
+        const sum = glue.add_ingredient_quantities(first, second);
+        return sum ? glue.quantity_to_cooklang(sum) : undefined;
     } catch {
         return 'not-addable';
     }
@@ -83,7 +109,8 @@ export function addQuantities(a: string | undefined, b: string | undefined): str
  */
 export function editText(line: FreeHandLine): string {
     load();
-    return glue.ingredient_edit_text(line.name, line.quantity);
+    const quantity = line.quantity === undefined ? undefined : toQuantity(line.quantity);
+    return glue.ingredient_edit_text(line.name, quantity);
 }
 
 /**
