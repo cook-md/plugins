@@ -36,12 +36,16 @@ describe('ingredients', () => {
         assert.strictEqual(addQuantities('1%l', '200%ml'), 'not-addable');
         assert.strictEqual(addQuantities('a pinch', '1'), 'not-addable');
         assert.strictEqual(addQuantities(undefined, '2'), 'not-addable');
+        assert.strictEqual(addQuantities('1/2%cup', '1/2%cup'), '1%cup');
+        // A stored quantity that does not read back the same is left alone.
+        assert.strictEqual(addQuantities('2}%l', '1%l'), 'not-addable');
     });
 
     it('gives the text an edit box starts with', () => {
         assert.strictEqual(editText({ name: 'Milk', quantity: '2%l' }), 'Milk 2 l');
         // Amounts the rules would not read back the same are left out.
         assert.strictEqual(editText({ name: 'salt', quantity: 'a pinch' }), 'salt');
+        assert.strictEqual(editText({ name: 'x', quantity: '2}%l' }), 'x');
     });
 
     it('edits without re-reading lines that were not changed', () => {
